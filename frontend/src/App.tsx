@@ -24,7 +24,7 @@ export default function App() {
     }
   }, []);
 
-  const { mensajes, enviar, cargando } = useAiChat(onAcciones);
+  const { mensajes, enviar, cargando, modo } = useAiChat(onAcciones);
   const onSeleccion = useCallback((id: number) => {
     setChatAbierto(true);
     enviar(`Dame el informe crítico de la casa id ${id}`);
@@ -40,7 +40,7 @@ export default function App() {
         <span className="contador">{visibles} de {casas.length} avisos · mapa + IA</span>
       </header>
       {chatAbierto
-        ? <ChatWindow mensajes={mensajes} cargando={cargando} enviar={enviar} onCerrar={() => setChatAbierto(false)} />
+        ? <ChatWindow mensajes={mensajes} cargando={cargando} enviar={enviar} modo={modo} onCerrar={() => setChatAbierto(false)} />
         : <button className="chat-fab" onClick={() => setChatAbierto(true)} aria-label="Abrir chat">💬</button>}
     </>
   );

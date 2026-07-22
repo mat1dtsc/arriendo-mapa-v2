@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TOOL_DECLARATIONS } from './tool-declarations';
 import { ToolExecutorService, AccionMapa } from './tool-executor.service';
+import { ModoBasicoService } from './modo-basico.service';
 
 const SYSTEM_PROMPT = `Eres el asistente de ArriendoMapa Chile, experto en arriendos de Santiago.
 Hablas español chileno cercano y directo, sin exagerar la jerga. Respuestas breves (2-5 frases), útiles y honestas.
@@ -12,6 +13,7 @@ export interface RespuestaChat {
   respuesta: string;
   acciones: AccionMapa[];
   tools_usadas: string[];
+  modo?: 'ia' | 'basico';
 }
 
 /** Loop agéntico con la API de Anthropic — versión compacta del claude-ai.service.ts de CotizadorIA. */
@@ -22,17 +24,12 @@ export class ClaudeService {
   constructor(
     private readonly config: ConfigService,
     private readonly executor: ToolExecutorService,
+    private readonly basico: ModoBasicoService,
   ) {}
 
   async chat(mensaje: string, historial: Array<{ rol: string; texto: string }> = []): Promise<RespuestaChat> {
     const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
-    if (!apiKey) {
-      return {
-        respuesta: 'Falta configurar ANTHROPIC_API_KEY en el backend (.env). Copia .env.example a .env y pega tu clave de console.anthropic.com.',
-        acciones: [],
-        tools_usadas: [],
-      };
-    }
+    if (!apiKey) return this.basico.responder(mensaje);
     const modelo = this.config.get<string>('CLAUDE_MODEL') || 'claude-sonnet-4-6';
 
     const messages: any[] = [
@@ -62,8 +59,8 @@ export class ClaudeService {
       });
       if (!r.ok) {
         const err = await r.text();
-        this.logger.error(`Anthropic ${r.status}: ${err.slice(0, 300)}`);
-        return { respuesta: `Error del modelo (${r.status}). Revisa la clave o el modelo en .env.`, acciones, tools_usadas: toolsUsadas };
+        this.logger.error(`Anthropic ${r.status}: ${err.slice(0, 300)} — usando modo básico`);
+        return this.basico.responder(mensaje);
       }
       const data: any = await r.json();
 
@@ -82,6 +79,6 @@ export class ClaudeService {
       messages.push({ role: 'user', content: resultados });
     }
 
-    return { respuesta: texto || 'No pude generar respuesta, intenta de nuevo.', acciones, tools_usadas: toolsUsadas };
+    return { respuesta: texto || 'No pude generar respuesta, intenta de nuevo.', acciones, tools_usadas: toolsUsadas, modo: 'ia' };
   }
 }
