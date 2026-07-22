@@ -1,0 +1,42 @@
+:root{
+  --fondo:#0B1620; --panel:#101F2C; --panel2:#16293A; --borde:#223A4E;
+  --texto:#ECF4F9; --sub:#8FB0C4; --agua:#41C6E0; --alerta:#FFC53D;
+  --peligro:#FF5D4D; --ok:#3FD68F; --atento:#6EA8C9;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#root{height:100%}
+body{font-family:'Archivo',system-ui,sans-serif;background:var(--fondo);color:var(--texto);overflow:hidden}
+.mono{font-family:'IBM Plex Mono',monospace}
+#mapa{position:fixed;inset:0;background:#d8e2e8}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:1000;padding:12px 14px;background:linear-gradient(180deg,var(--fondo) 55%,transparent);display:flex;align-items:center;gap:10px}
+.brand{font-weight:900;font-size:19px;letter-spacing:.5px}
+.brand b{color:var(--agua)}
+.brand .v2{font-size:10px;background:var(--agua);color:#04222B;border-radius:4px;padding:1px 5px;vertical-align:3px;margin-left:5px;letter-spacing:1px}
+.contador{font-size:11.5px;color:var(--sub)}
+.canal-anim{stroke-dasharray:8 7;animation:fluir 1.6s linear infinite}
+@keyframes fluir{to{stroke-dashoffset:-15}}
+.pulso{position:relative;width:16px;height:16px}
+.pulso i{position:absolute;inset:3px;border-radius:50%;border:2px solid #fff}
+.pulso::after{content:"";position:absolute;inset:0;border-radius:50%;animation:onda 2.4s ease-out infinite}
+@keyframes onda{0%{box-shadow:0 0 0 0 var(--co,rgba(65,198,224,.5))}100%{box-shadow:0 0 0 16px rgba(0,0,0,0)}}
+@media(prefers-reduced-motion:reduce){.pulso::after,.canal-anim{animation:none}}
+/* ── Chat flotante (calcado del AiChatbot de CotizadorIA) ── */
+.chat-fab{position:fixed;right:14px;bottom:14px;z-index:1200;width:56px;height:56px;border-radius:50%;border:none;background:var(--agua);color:#04222B;font-size:24px;cursor:pointer;box-shadow:0 8px 24px rgba(65,198,224,.4)}
+.chat-win{position:fixed;z-index:1300;background:var(--fondo);border:1px solid var(--borde);display:flex;flex-direction:column;overflow:hidden;right:14px;bottom:80px;width:min(400px,calc(100vw - 28px));height:min(560px,calc(100vh - 120px));border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+@media(max-width:520px){.chat-win{right:0;bottom:0;width:100vw;height:78vh;border-radius:16px 16px 0 0}}
+.chat-head{padding:12px 14px;background:var(--panel);border-bottom:1px solid var(--borde);display:flex;justify-content:space-between;align-items:center}
+.chat-head .t{font-weight:800;font-size:14px}
+.chat-head .t small{display:block;font-weight:500;color:var(--sub);font-size:11px}
+.chat-head button{background:none;border:none;color:var(--sub);font-size:18px;cursor:pointer}
+.chat-cuerpo{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:86%;padding:10px 12px;border-radius:14px;font-size:13.5px;line-height:1.5;white-space:pre-wrap}
+.msg.usuario{align-self:flex-end;background:var(--agua);color:#04222B;border-bottom-right-radius:4px;font-weight:600}
+.msg.asistente{align-self:flex-start;background:var(--panel2);border:1px solid var(--borde);border-bottom-left-radius:4px}
+.msg .tools{margin-top:6px;font-size:10px;color:var(--agua);font-family:'IBM Plex Mono',monospace}
+.escribiendo{align-self:flex-start;color:var(--sub);font-size:12px;padding:4px 8px}
+.chat-input{display:flex;gap:8px;padding:10px;border-top:1px solid var(--borde);background:var(--panel)}
+.chat-input input{flex:1;background:var(--fondo);border:1px solid var(--borde);color:var(--texto);border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none}
+.chat-input input:focus{border-color:var(--agua)}
+.chat-input button{background:var(--agua);color:#04222B;border:none;border-radius:10px;padding:0 16px;font-weight:800;font-size:14px;cursor:pointer}
+.chat-input button:disabled{opacity:.5}
+.leaflet-control-attribution{font-size:9px;opacity:.75}
