@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>ArriendoMapa · Santiago</title>
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080D12; --surface:#0E1620; --surface2:#152131; --line:#1F3145;
+  --fg:#EAF2F8; --dim:#7E9BB2; --faint:#4A6377;
+  --cyan:#3ED8F0; --lime:#4FE39B; --amber:#FFC857; --coral:#FF6B5B; --violet:#9B8CFF;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--fg);font-family:Archivo,system-ui,sans-serif;font-size:14px}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+#map{position:fixed;inset:0}
+.maplibregl-ctrl-attrib{background:rgba(8,13,18,.7)!important;color:var(--faint)!important;font-size:9px}
+.maplibregl-ctrl-attrib a{color:var(--faint)!important}
+.maplibregl-ctrl-group{background:var(--surface)!important;border:1px solid var(--line)!important;box-shadow:none!important}
+.maplibregl-ctrl-group button+button{border-top:1px solid var(--line)!important}
+.maplibregl-ctrl-icon{filter:invert(.75) hue-rotate(160deg)}
+
+/* ── Píldoras de precio ── */
+.pin{cursor:pointer;transform:translateY(-2px);transition:transform .12s}
+.pin:hover{transform:translateY(-4px) scale(1.06);z-index:5}
+.pill{display:flex;align-items:center;gap:5px;background:rgba(14,22,32,.94);border:1px solid var(--line);
+  border-radius:999px;padding:5px 10px 5px 7px;font-size:12px;font-weight:700;letter-spacing:.2px;
+  backdrop-filter:blur(8px);box-shadow:0 4px 14px rgba(0,0,0,.5);white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor}
+.pin.sel .pill{background:var(--cyan);color:#04222B;border-color:var(--cyan);box-shadow:0 6px 22px rgba(62,216,240,.55)}
+.pin.sel .dot{background:#04222B!important;box-shadow:none}
+.pin.dim{opacity:.28;filter:saturate(.3)}
+
+/* ── Cabecera ── */
+.head{position:fixed;top:0;left:0;right:0;z-index:20;padding:14px 16px;
+  background:linear-gradient(180deg,rgba(8,13,18,.95) 40%,transparent);pointer-events:none;
+  display:flex;align-items:flex-start;gap:12px}
+.logo{font-weight:900;font-size:17px;letter-spacing:-.3px;pointer-events:auto}
+.logo b{color:var(--cyan)}
+.logo span{display:block;font-size:10px;font-weight:500;color:var(--faint);letter-spacing:1.6px;text-transform:uppercase;margin-top:1px}
+.stat{margin-left:auto;text-align:right;pointer-events:auto}
+.stat .n{font-size:19px;font-weight:800;line-height:1}
+.stat .l{font-size:10px;color:var(--faint);letter-spacing:.6px;text-transform:uppercase}
+
+/* ── Controles de capa ── */
+.layers{position:fixed;left:16px;top:78px;z-index:20;display:flex;flex-direction:column;gap:6px}
+.lyr{display:flex;align-items:center;gap:7px;background:rgba(14,22,32,.88);border:1px solid var(--line);
+  border-radius:9px;padding:7px 11px;font-size:11.5px;font-weight:600;color:var(--dim);cursor:pointer;
+  backdrop-filter:blur(10px);transition:.15s;white-space:nowrap}
+.lyr:hover{color:var(--fg)}
+.lyr.on{color:var(--fg);border-color:var(--cyan);background:rgba(62,216,240,.1)}
+.lyr i{width:8px;height:8px;border-radius:2px;background:currentColor;flex:none}
+
+/* ── Ficha ── */
+.sheet{position:fixed;z-index:40;background:var(--surface);border:1px solid var(--line);display:none;flex-direction:column;
+  left:16px;bottom:16px;width:340px;max-height:calc(100vh - 200px);border-radius:16px;overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.sheet.open{display:flex}
+@media(max-width:760px){.sheet{left:0;right:0;bottom:0;width:100%;max-height:76vh;border-radius:18px 18px 0 0}}
+.sheet .x{position:absolute;top:10px;right:10px;z-index:3;width:30px;height:30px;border-radius:50%;
+  background:rgba(8,13,18,.8);border:1px solid var(--line);color:var(--fg);cursor:pointer;font-size:14px}
+.sh-scroll{overflow-y:auto}
+.sh-img{height:150px;background:var(--surface2);display:flex;gap:2px}
+.sh-img img{flex:1;min-width:0;object-fit:cover}
+.sh-body{padding:14px 16px 18px}
+.sh-price{font-size:24px;font-weight:800;letter-spacing:-.5px}
+.sh-price em{font-size:12px;font-weight:500;color:var(--dim);font-style:normal}
+.sh-loc{font-size:12.5px;color:var(--dim);margin:2px 0 12px}
+.sh-specs{display:flex;gap:16px;font-size:12px;color:var(--dim);padding-bottom:14px;border-bottom:1px solid var(--line)}
+.sh-specs b{color:var(--fg);font-weight:700}
+.row{padding:13px 0;border-bottom:1px solid var(--line)}
+.row:last-of-type{border:none}
+.row .rh{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.row .rt{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);font-weight:700}
+.tag{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:6px;letter-spacing:.3px}
+.row .rd{font-size:12.5px;color:var(--dim);line-height:1.6}
+.row .rd b{color:var(--fg)}
+.src{font-size:9.5px;color:var(--faint);margin-top:6px}
+.bus{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}
+.bus span{font-size:10px;font-weight:700;background:var(--surface2);color:var(--cyan);padding:2px 6px;border-radius:4px;font-family:'IBM Plex Mono',monospace}
+.cta{display:block;text-align:center;background:var(--cyan);color:#04222B;font-weight:800;border-radius:10px;padding:11px;margin-top:14px;text-decoration:none;font-size:13px}
+
+/* ── Chat ── */
+.fab{position:fixed;right:16px;bottom:16px;z-index:30;height:46px;padding:0 18px;border:none;border-radius:23px;
+  background:var(--cyan);color:#04222B;font-weight:800;font-size:13.5px;font-family:inherit;cursor:pointer;
+  box-shadow:0 8px 26px rgba(62,216,240,.4);display:flex;align-items:center;gap:7px}
+.chat{position:fixed;z-index:45;right:16px;bottom:16px;width:370px;height:min(540px,calc(100vh - 120px));
+  background:var(--surface);border:1px solid var(--line);border-radius:16px;display:none;flex-direction:column;
+  overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.chat.open{display:flex}
+@media(max-width:760px){.chat{left:0;right:0;bottom:0;width:100%;height:78vh;border-radius:18px 18px 0 0}}
+.ch-head{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.ch-head .t{font-size:13.5px;font-weight:800}
+.ch-head .t small{display:block;font-weight:500;color:var(--faint);font-size:10.5px;margin-top:1px}
+.ch-head button{background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer}
+.ch-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:9px}
+.m{max-width:88%;padding:9px 12px;border-radius:13px;font-size:13px;line-height:1.55;white-space:pre-wrap}
+.m.u{align-self:flex-end;background:var(--cyan);color:#04222B;font-weight:600;border-bottom-right-radius:4px}
+.m.a{align-self:flex-start;background:var(--surface2);border-bottom-left-radius:4px}
+.m .tl{margin-top:5px;font-size:9.5px;color:var(--cyan);font-family:'IBM Plex Mono',monospace;opacity:.8}
+.sug{display:flex;gap:5px;flex-wrap:wrap;padding:0 14px 10px}
+.sug button{background:var(--surface2);border:1px solid var(--line);color:var(--dim);border-radius:999px;
+  padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+.sug button:hover{color:var(--fg);border-color:var(--cyan)}
+.ch-in{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.ch-in input{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:9px;
+  padding:10px 12px;font-size:13.5px;font-family:inherit;outline:none}
+.ch-in input:focus{border-color:var(--cyan)}
+.ch-in button{background:var(--cyan);color:#04222B;border:none;border-radius:9px;width:42px;font-size:14px;cursor:pointer}
+#boot{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:10px;color:var(--dim);font-size:13px;transition:opacity .5s}
+#boot.gone{opacity:0;pointer-events:none}
+.sp{width:26px;height:26px;border:2px solid var(--line);border-top-color:var(--cyan);border-radius:50%;animation:g .8s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="boot"><div class="sp"></div><div id="boot-t">Cargando mapa vectorial…</div></div>
+
+<header class="head">
+  <div class="logo">ARRIENDO<b>MAPA</b><span>Santiago · riesgo & conectividad</span></div>
+  <div class="stat"><div class="n" id="n">—</div><div class="l" id="nl">propiedades</div></div>
+</header>
+
+<div class="layers">
+  <button class="lyr on" data-l="flood"><i style="color:var(--cyan)"></i>Inundación</button>
+  <button class="lyr on" data-l="metro"><i style="color:var(--violet)"></i>Metro</button>
+  <button class="lyr" data-l="stops"><i style="color:var(--amber)"></i>Paraderos</button>
+</div>
+
+<aside class="sheet" id="sheet"><button class="x" id="shx">✕</button><div class="sh-scroll" id="shs"></div></aside>
+
+<button class="fab" id="fab">💬 Buscar con IA</button>
+<div class="chat" id="chat">
+  <div class="ch-head"><div class="t">Copiloto<small>inundación GORE · micros GTFS</small></div><button id="chx">✕</button></div>
+  <div class="ch-body" id="chb"></div>
+  <div class="sug" id="sug"></div>
+  <form class="ch-in" id="chf"><input id="chi" placeholder="3 dormitorios bajo 500 sin riesgo…" autocomplete="off"><button type="submit">➤</button></form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="datos.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const CLP=n=>'$'+n.toLocaleString('es-CL');
+const K=n=>'$'+Math.round(n/1000)+'k';
+const nm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const RC={bajo:'#4FE39B',atento:'#3ED8F0',medio:'#FFC857',alto:'#FF6B5B'};
+const RO={bajo:0,atento:1,medio:2,alto:3};
+
+/* ══ Motor de datos ══ */
+function score(t){if(!t||t.metro_m==null)return null;let s=0,m=t.metro_m;
+  s+=m<=600?35:m<=1000?30:m<=1600?22:m<=2600?12:4;
+  s+=Math.min(30,(t.n_recorridos||0)*2.5);s+=Math.min(20,(t.buses_hora_punta||0)/6);
+  const p=t.paradero_min_m;s+=p==null?0:p<=250?15:p<=400?10:p<=600?5:0;
+  return Math.round(Math.min(100,s));}
+const comunas=()=>Object.keys(DATOS.meta.medianas_pxm);
+function buscar(f){const q=nm(f.texto||'');return DATOS.casas.filter(c=>{
+  if(f.precio_max&&c.precio>f.precio_max)return false;
+  if(f.precio_min&&c.precio<f.precio_min)return false;
+  if(f.dormitorios_min&&c.dorm<f.dormitorios_min)return false;
+  if(f.comuna&&nm(c.comuna)!==nm(f.comuna))return false;
+  if(f.riesgo_maximo&&RO[c.r.nivel]>RO[f.riesgo_maximo])return false;
+  if(f.locomocion_min&&(score(c.t)||0)<f.locomocion_min)return false;
+  if(q&&!nm(c.sector+' '+c.comuna+' '+c.nota).includes(q))return false;
+  return true;});}
+function zona(cm){const cs=DATOS.casas.filter(c=>nm(c.comuna)===nm(cm));if(!cs.length)return null;
+  const p=cs.map(c=>c.precio).sort((a,b)=>a-b),rg={},rc={};
+  cs.forEach(c=>{rg[c.r.nivel]=(rg[c.r.nivel]||0)+1;(c.t?.recorridos||[]).forEach(r=>rc[r]=(rc[r]||0)+1)});
+  return{comuna:cs[0].comuna,total:cs.length,med:p[p.length>>1],m2:DATOS.meta.medianas_pxm[cs[0].comuna],rg,
+    rc:Object.entries(rc).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]),
+    pc:DATOS.pc.filter(x=>nm(x.comuna)===nm(cm)).length,
+    ctr:[cs.reduce((s,c)=>s+c.lon,0)/cs.length,cs.reduce((s,c)=>s+c.lat,0)/cs.length]};}
+
+/* ══ Chequeo de soporte ══ */
+function webglOK(){try{const c=document.createElement('canvas');
+  return !!(window.WebGLRenderingContext&&(c.getContext('webgl')||c.getContext('experimental-webgl')));}catch(e){return false}}
+if(typeof maplibregl==='undefined'||!webglOK()){
+  document.getElementById('boot').innerHTML='<div style="text-align:center;padding:30px;max-width:340px">'+
+    '<div style="font-size:34px;margin-bottom:10px">🗺️</div>'+
+    '<div style="color:#EAF2F8;font-weight:700;margin-bottom:8px">Tu navegador no soporta mapas 3D</div>'+
+    '<div style="font-size:12.5px;line-height:1.6">Este mapa usa WebGL. Prueba abrirlo en <b>Chrome</b> actualizado, o usa la versión clásica <b>index-clasico.html</b> que funciona en cualquier navegador.</div></div>';
+  throw new Error('sin webgl');
+}
+
+/* ══ Mapa vectorial ══ */
+const map=new maplibregl.Map({
+  container:'map',
+  style:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+  center:[-70.62,-33.54],zoom:10.6,pitch:35,bearing:-12,attributionControl:{compact:true},
+  maxZoom:17.5,minZoom:9
+});
+map.addControl(new maplibregl.NavigationControl({showCompass:true}),'bottom-right');
+map.dragRotate.enable();
+
+const fc=(feats)=>({type:'FeatureCollection',features:feats});
+let pins=[],visibles=null,selId=null;
+
+map.on('load',()=>{
+  $('#boot').classList.add('gone');
+
+  /* ── Inundación: mapa de calor + núcleos ── */
+  map.addSource('flood',{type:'geojson',data:fc(DATOS.pc.map(p=>({type:'Feature',
+    properties:{causa:p.causa,sector:p.sector,comuna:p.comuna},
+    geometry:{type:'Point',coordinates:[p.lon,p.lat]}})))});
+  map.addLayer({id:'flood-heat',type:'heatmap',source:'flood',maxzoom:15,paint:{
+    'heatmap-weight':.9,'heatmap-intensity':['interpolate',['linear'],['zoom'],9,.7,15,2.4],
+    'heatmap-color':['interpolate',['linear'],['heatmap-density'],
+      0,'rgba(0,40,60,0)',.2,'rgba(20,120,180,.35)',.45,'rgba(62,180,240,.5)',
+      .7,'rgba(120,200,255,.6)',1,'rgba(200,240,255,.75)'],
+    'heatmap-radius':['interpolate',['linear'],['zoom'],9,18,15,55],'heatmap-opacity':.85}});
+  map.addLayer({id:'flood-pt',type:'circle',source:'flood',minzoom:11.5,paint:{
+    'circle-radius':['interpolate',['linear'],['zoom'],11.5,2.5,16,6],
+    'circle-color':'#8FE4FF','circle-blur':.25,
+    'circle-opacity':['interpolate',['linear'],['zoom'],11.5,.35,14,.95],
+    'circle-stroke-width':1,'circle-stroke-color':'rgba(160,230,255,.4)'}});
+
+  /* ── Canales ── */
+  const cf=[];Object.entries(DATOS.canales||{}).forEach(([n,segs])=>segs.forEach(s=>{
+    if(s.length>1)cf.push({type:'Feature',properties:{name:n},geometry:{type:'LineString',coordinates:s.map(v=>[v[1],v[0]])}})}));
+  map.addSource('canal',{type:'geojson',data:fc(cf)});
+  map.addLayer({id:'canal-glow',type:'line',source:'canal',paint:{'line-color':'#3ED8F0','line-width':7,'line-blur':6,'line-opacity':.3}});
+  map.addLayer({id:'canal',type:'line',source:'canal',paint:{'line-color':'#7FE9FA','line-width':1.6,'line-opacity':.75,'line-dasharray':[3,2]}});
+
+  /* ── Metro ── */
+  const mf=[];(DATOS.lineas||[]).forEach(l=>l.tramos.forEach(t=>{
+    if(t.length>1)mf.push({type:'Feature',properties:{c:l.color},geometry:{type:'LineString',coordinates:t.map(v=>[v[1],v[0]])}})}));
+  map.addSource('metro',{type:'geojson',data:fc(mf)});
+  map.addLayer({id:'metro',type:'line',source:'metro',paint:{'line-color':['get','c'],'line-width':2.2,'line-opacity':.55}});
+  map.addSource('mest',{type:'geojson',data:fc(DATOS.metro.map(m=>({type:'Feature',properties:{n:m.name},geometry:{type:'Point',coordinates:[m.lon,m.lat]}})))});
+  map.addLayer({id:'mest',type:'circle',source:'mest',minzoom:11,paint:{'circle-radius':3,'circle-color':'#0E1620','circle-stroke-width':1.4,'circle-stroke-color':'#B9AEFF'}});
+
+  /* ── Paraderos ── */
+  map.addSource('stops',{type:'geojson',data:fc((DATOS.paraderos||[]).map(p=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:[p.lon,p.lat]}})))});
+  map.addLayer({id:'stops',type:'circle',source:'stops',minzoom:12.5,layout:{visibility:'none'},
+    paint:{'circle-radius':1.8,'circle-color':'#FFC857','circle-opacity':.6}});
+
+  map.on('click','flood-pt',e=>{const p=e.features[0].properties;
+    new maplibregl.Popup({closeButton:false,offset:10}).setLngLat(e.lngLat)
+      .setHTML(`<div style="font:600 11.5px Archivo,sans-serif;color:#0b1620"><b>${p.sector}</b><br>${p.causa}<br><span style="opacity:.6">${p.comuna}</span></div>`).addTo(map);});
+  map.on('mouseenter','flood-pt',()=>map.getCanvas().style.cursor='pointer');
+  map.on('mouseleave','flood-pt',()=>map.getCanvas().style.cursor='');
+
+  crearPins();
+  setTimeout(()=>map.easeTo({pitch:42,bearing:-18,duration:2600}),400);
+});
+setTimeout(()=>{if(!map.isStyleLoaded()){document.getElementById('boot-t').innerHTML=
+  'El mapa está tardando…<br><span style="font-size:11px">revisa tu conexión a internet</span>';}},8000);
+map.on('error',e=>{console.warn('map',e&&e.error);});
+
+/* ── Píldoras de precio ── */
+function crearPins(){
+  DATOS.casas.forEach(c=>{
+    const el=document.createElement('div');el.className='pin';
+    el.innerHTML=`<div class="pill"><span class="dot" style="background:${RC[c.r.nivel]};color:${RC[c.r.nivel]}"></span>${K(c.precio)}</div>`;
+    el.onclick=ev=>{ev.stopPropagation();abrir(c.id)};
+    pins.push({id:c.id,el,mk:new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat([c.lon,c.lat]).addTo(map)});
+  });
+  actualizar();
+}
+function actualizar(){
+  const set=visibles?new Set(visibles):null;
+  pins.forEach(p=>{
+    p.el.classList.toggle('dim',!!set&&!set.has(p.id));
+    p.el.classList.toggle('sel',p.id===selId);
+  });
+  const n=set?set.size:DATOS.casas.length;
+  $('#n').textContent=n;$('#nl').textContent=set?'de '+DATOS.casas.length+' propiedades':'propiedades';
+}
+
+/* ── Ficha ── */
+function abrir(id){
+  const c=DATOS.casas.find(x=>x.id===id);if(!c)return;
+  selId=id;actualizar();
+  map.flyTo({center:[c.lon,c.lat],zoom:15,pitch:50,duration:1200,essential:true});
+  const s=score(c.t),t=c.t||{},r=c.r;
+  const nv={alto:['ALTO','#FF6B5B'],medio:['MEDIO','#FFC857'],atento:['ATENTO','#3ED8F0'],bajo:['BAJO','#4FE39B']}[r.nivel];
+  const ln=s==null?'s/d':s>=75?'Excelente':s>=55?'Buena':s>=35?'Media':'Baja';
+  const am=c.amen?Object.entries(c.amen).filter(([,v])=>v).map(([k])=>({estac:'Estacionamiento',mascotas:'Mascotas',piscina:'Piscina',condominio:'Condominio'}[k]||k)):[];
+  $('#shs').innerHTML=`
+   ${c.fotos&&c.fotos.length?`<div class="sh-img">${c.fotos.map(f=>`<img src="${f}" loading="lazy" alt="">`).join('')}</div>`:''}
+   <div class="sh-body">
+     <div class="sh-price mono">${CLP(c.precio)} <em>/mes</em></div>
+     <div class="sh-loc">${c.sector} · ${c.comuna}${c.estado==='verificado'?' · ✓':''}</div>
+     <div class="sh-specs"><span><b>${c.dorm}</b> dorm</span><span><b>${c.banos}</b> baños</span><span><b>${c.m2}</b> m²</span><span class="mono"><b>${c.pxm?CLP(c.pxm):'—'}</b>/m²</span></div>
+     ${am.length?`<div class="bus" style="margin-top:12px">${am.map(a=>`<span style="color:var(--dim)">${a}</span>`).join('')}</div>`:''}
+     <div class="row"><div class="rh"><span class="rt">💧 Riesgo de invierno</span><span class="tag" style="background:${nv[1]}22;color:${nv[1]}">${nv[0]}</span></div>
+       <div class="rd">Punto crítico a <b class="mono">${r.pc_m<1000?r.pc_m+' m':(r.pc_m/1000).toFixed(1)+' km'}</b>: <b>${r.pc_sector}</b> — ${r.pc_causa.toLowerCase()}.${r.canal?` <b>${r.canal}</b> a <b class="mono">${r.canal_m} m</b>.`:''}</div>
+       <div class="src">${DATOS.meta.fuente_pc}</div></div>
+     <div class="row"><div class="rh"><span class="rt">🚌 Locomoción</span><span class="tag" style="background:#3ED8F022;color:var(--cyan)">${ln}${s!=null?' · '+s:''}</span></div>
+       <div class="rd"><b>${t.n_recorridos??'—'}</b> recorridos · <b class="mono">${t.buses_hora_punta??'—'}</b> buses/h punta · paradero a <b class="mono">${t.paradero_min_m??'—'} m</b> · Metro <b>${t.metro_est||'—'}</b> a <b class="mono">${t.metro_m!=null?(t.metro_m<1000?t.metro_m+' m':(t.metro_m/1000).toFixed(1)+' km'):'—'}</b>
+       ${t.recorridos?.length?`<div class="bus">${t.recorridos.slice(0,10).map(x=>`<span>${x}</span>`).join('')}</div>`:''}</div>
+       <div class="src">${DATOS.meta.fuente_gtfs}</div></div>
+     <div class="row"><div class="rh"><span class="rt">💰 Precio vs comuna</span>${c.dev!=null?`<span class="tag" style="background:${c.dev<=-5?'#4FE39B22;color:#4FE39B':c.dev>=8?'#FF6B5B22;color:#FF6B5B':'#152131;color:#7E9BB2'}">${c.dev>0?'+':''}${c.dev}%</span>`:''}</div>
+       <div class="rd">${c.dev==null?'Sin m² para comparar.':`<b>${c.dev>0?c.dev+'% sobre':Math.abs(c.dev)+'% bajo'}</b> la mediana de ${c.comuna} (<b class="mono">${CLP(DATOS.meta.medianas_pxm[c.comuna]||0)}/m²</b>).`}</div></div>
+     ${c.nota?`<div class="rd" style="margin-top:12px;font-size:12px">${c.nota}</div>`:''}
+     <a class="cta" href="${c.link}" target="_blank" rel="noopener">Ver aviso original ↗</a>
+   </div>`;
+  $('#sheet').classList.add('open');
+}
+$('#shx').onclick=()=>{$('#sheet').classList.remove('open');selId=null;actualizar()};
+
+/* ── Capas ── */
+document.querySelectorAll('.lyr').forEach(b=>b.onclick=()=>{
+  b.classList.toggle('on');const on=b.classList.contains('on');
+  const ids={flood:['flood-heat','flood-pt','canal','canal-glow'],metro:['metro','mest'],stops:['stops']}[b.dataset.l];
+  ids.forEach(i=>map.getLayer(i)&&map.setLayoutProperty(i,'visibility',on?'visible':'none'));
+});
+
+/* ── Copiloto (modo reglas) ── */
+function responder(txt){
+  const t=nm(txt);
+  const mId=t.match(/(?:casa|id|informe|detalle|ficha)\D{0,12}(\d{1,3})/);
+  if(mId){const c=DATOS.casas.find(x=>x.id===+mId[1]);
+    if(!c)return{r:`No existe la propiedad #${mId[1]}.`,tl:[]};
+    abrir(c.id);
+    return{r:`Abrí la ficha de #${c.id} — ${c.sector}, ${c.comuna}. ${CLP(c.precio)}/mes, riesgo ${c.r.nivel}, locomoción ${score(c.t)??'s/d'}/100.`,tl:['informe_critico']};}
+  const cm=comunas().find(c=>t.includes(nm(c)));
+  if(cm&&/(como es|conviene|que tal|resumen|informacion|datos de)/.test(t)&&!/\d/.test(t)){
+    const z=zona(cm);map.flyTo({center:z.ctr,zoom:12.4,pitch:45,duration:1400});
+    visibles=DATOS.casas.filter(c=>nm(c.comuna)===nm(cm)).map(c=>c.id);actualizar();
+    return{r:`📊 ${z.comuna}: ${z.total} avisos · mediana ${CLP(z.med)}${z.m2?' · '+CLP(z.m2)+'/m²':''}\n💧 ${Object.entries(z.rg).map(([k,v])=>v+' '+k).join(', ')} · ${z.pc} puntos críticos de lluvia\n🚌 Micros frecuentes: ${z.rc.join(', ')||'s/d'}`,tl:['estadisticas_zona']};}
+  const f={};if(cm)f.comuna=cm;
+  const md=t.match(/(\d)\s*(?:d\b|dorm|habitacion|pieza)/);if(md)f.dormitorios_min=+md[1];
+  const ns=[...t.matchAll(/(\d[\d.,]*)\s*(millon|millones|mil|lucas)?/g)].map(m=>{
+    let n=+m[1].replace(/[.,]/g,'');if(/millon/.test(m[2]||''))n*=1e6;else if(/(mil|lucas)/.test(m[2]||''))n*=1e3;else if(n<1000)n*=1e3;return n;})
+    .filter(n=>n>=1e5&&n<=5e6&&(!f.dormitorios_min||n!==f.dormitorios_min*1000));
+  if(ns.length&&/(bajo|hasta|menos|max|tope|presupuesto)/.test(t))f.precio_max=Math.max(...ns);
+  else if(ns.length&&/(sobre|desde|mas de|minimo)/.test(t))f.precio_min=Math.min(...ns);
+  else if(ns.length)f.precio_max=Math.max(...ns);
+  if(/(sin riesgo|no se inund|seguras?|secas?)/.test(t))f.riesgo_maximo='bajo';
+  if(/(bien conectad|buena locomocion|con micros|cerca del metro)/.test(t))f.locomocion_min=55;
+  if(/barat/.test(t)&&!f.precio_max)f.precio_max=45e4;
+  if(!Object.keys(f).length)return{r:'Prueba con:\n• "3 dormitorios bajo 500 en Puente Alto sin riesgo"\n• "baratas bien conectadas en La Florida"\n• "¿cómo es La Cisterna?"\n• "ficha de la casa 2"',tl:[]};
+  const res=buscar(f);
+  if(!res.length){visibles=[];actualizar();return{r:'Sin resultados 😕 Prueba subiendo el presupuesto o soltando una condición.',tl:['buscar_casas']};}
+  visibles=res.map(c=>c.id);actualizar();
+  const b=new maplibregl.LngLatBounds();res.forEach(c=>b.extend([c.lon,c.lat]));
+  map.fitBounds(b,{padding:{top:120,bottom:180,left:80,right:80},maxZoom:14.5,duration:1400});
+  const top=res.slice(0,3).map(c=>`• #${c.id} ${CLP(c.precio)} — ${c.sector} (${c.dorm}D · 💧${c.r.nivel} · 🚌${score(c.t)??'s/d'})`).join('\n');
+  const ft=[f.comuna,f.dormitorios_min&&f.dormitorios_min+'+ dorm',f.precio_max&&'hasta '+CLP(f.precio_max),f.riesgo_maximo&&'sin riesgo',f.locomocion_min&&'bien conectadas'].filter(Boolean).join(' · ');
+  return{r:`🔎 ${res.length} propiedades (${ft})\n${top}\nLas resalté en el mapa — pide "ficha de la casa N" para el detalle.`,tl:['buscar_casas']};
+}
+function burb(rol,txt,tl){const d=document.createElement('div');d.className='m '+rol;d.textContent=txt;
+  if(tl?.length){const s=document.createElement('div');s.className='tl';s.textContent='⚙ '+tl.join(' · ');d.appendChild(s);}
+  $('#chb').appendChild(d);$('#chb').scrollTop=$('#chb').scrollHeight;}
+function enviar(t){if(!t.trim())return;burb('u',t);setTimeout(()=>{const r=responder(t);burb('a',r.r,r.tl);},220);}
+$('#chf').onsubmit=e=>{e.preventDefault();const v=$('#chi').value;$('#chi').value='';enviar(v);};
+$('#fab').onclick=()=>{$('#chat').classList.add('open');$('#fab').style.display='none'};
+$('#chx').onclick=()=>{$('#chat').classList.remove('open');$('#fab').style.display='flex'};
+['3D bajo 500 en Puente Alto sin riesgo','baratas bien conectadas','¿cómo es La Florida?','ficha de la casa 2']
+  .forEach(s=>{const b=document.createElement('button');b.textContent=s;b.onclick=()=>enviar(s);$('#sug').appendChild(b)});
+burb('a','Hola 👋 Busco por ti con datos que ningún portal tiene: riesgo de inundación calle por calle y micros reales. Pídeme algo o toca una píldora de precio en el mapa.');
+</script>
+</body>
+</html>

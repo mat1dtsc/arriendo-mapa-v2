@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ArriendoMapa v2 · Mapa + Copiloto</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800;900&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--fondo:#0B1620;--panel:#101F2C;--panel2:#16293A;--borde:#223A4E;--texto:#ECF4F9;--sub:#8FB0C4;--agua:#41C6E0;--alerta:#FFC53D;--peligro:#FF5D4D;--ok:#3FD68F;--atento:#6EA8C9}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:'Archivo',system-ui,sans-serif;background:var(--fondo);color:var(--texto);overflow:hidden}
+.mono{font-family:'IBM Plex Mono',monospace}
+#mapa{position:fixed;inset:0;background:#d8e2e8}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:1000;padding:12px 14px;background:linear-gradient(180deg,var(--fondo) 55%,transparent);display:flex;align-items:center;gap:10px}
+.brand{font-weight:900;font-size:19px;letter-spacing:.5px}
+.brand b{color:var(--agua)}
+.brand .v2{font-size:10px;background:var(--agua);color:#04222B;border-radius:4px;padding:1px 5px;vertical-align:3px;margin-left:5px;letter-spacing:1px}
+.contador{font-size:11.5px;color:var(--sub)}
+.canal-anim{stroke-dasharray:8 7;animation:fluir 1.6s linear infinite}
+@keyframes fluir{to{stroke-dashoffset:-15}}
+.pulso{position:relative;width:16px;height:16px}
+.pulso i{position:absolute;inset:3px;border-radius:50%;border:2px solid #fff}
+.pulso::after{content:"";position:absolute;inset:0;border-radius:50%;animation:onda 2.4s ease-out infinite}
+@keyframes onda{0%{box-shadow:0 0 0 0 var(--co,rgba(65,198,224,.5))}100%{box-shadow:0 0 0 16px rgba(0,0,0,0)}}
+@media(prefers-reduced-motion:reduce){.pulso::after,.canal-anim{animation:none}}
+.chat-fab{position:fixed;right:14px;bottom:14px;z-index:1200;width:56px;height:56px;border-radius:50%;border:none;background:var(--agua);color:#04222B;font-size:24px;cursor:pointer;box-shadow:0 8px 24px rgba(65,198,224,.4)}
+.chat-win{position:fixed;z-index:1300;background:var(--fondo);border:1px solid var(--borde);display:flex;flex-direction:column;overflow:hidden;right:14px;bottom:80px;width:min(400px,calc(100vw - 28px));height:min(560px,calc(100vh - 120px));border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+@media(max-width:520px){.chat-win{right:0;bottom:0;width:100vw;height:80vh;border-radius:16px 16px 0 0}}
+.chat-head{padding:12px 14px;background:var(--panel);border-bottom:1px solid var(--borde);display:flex;justify-content:space-between;align-items:center}
+.chat-head .t{font-weight:800;font-size:14px}
+.chat-head .t small{display:block;font-weight:500;color:var(--sub);font-size:11px}
+.chat-head button{background:none;border:none;color:var(--sub);font-size:18px;cursor:pointer}
+.chat-cuerpo{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:88%;padding:10px 12px;border-radius:14px;font-size:13.5px;line-height:1.5;white-space:pre-wrap}
+.msg.usuario{align-self:flex-end;background:var(--agua);color:#04222B;border-bottom-right-radius:4px;font-weight:600}
+.msg.asistente{align-self:flex-start;background:var(--panel2);border:1px solid var(--borde);border-bottom-left-radius:4px}
+.msg .tools{margin-top:6px;font-size:10px;color:var(--agua);font-family:'IBM Plex Mono',monospace}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 10px}
+.chip{background:var(--panel2);border:1px solid var(--borde);color:var(--sub);border-radius:999px;padding:6px 11px;font-size:11.5px;font-weight:600;cursor:pointer}
+.chip:hover{color:var(--texto);border-color:var(--agua)}
+.chat-input{display:flex;gap:8px;padding:10px;border-top:1px solid var(--borde);background:var(--panel)}
+.chat-input input{flex:1;background:var(--fondo);border:1px solid var(--borde);color:var(--texto);border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none}
+.chat-input input:focus{border-color:var(--agua)}
+.chat-input button{background:var(--agua);color:#04222B;border:none;border-radius:10px;padding:0 16px;font-weight:800;font-size:14px;cursor:pointer}
+.leaflet-control-attribution{font-size:9px;opacity:.75}
+.leaflet-popup-content{font-family:'Archivo',sans-serif;font-size:12px}
+</style>
+</head>
+<body>
+<div id="mapa"></div>
+<div id="estado" style="position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:#0B1620;color:#8FB0C4;font-family:Archivo,sans-serif;text-align:center;padding:24px">
+  <div><div style="font-size:15px;margin-bottom:8px">🗺️ Cargando mapa…</div><div id="estado-sub" style="font-size:12px">conectando con el servidor de mapas</div></div>
+</div>
+<header class="topbar">
+  <div class="brand">ARRIENDO<b>MAPA</b><span class="v2">V2</span></div>
+  <span class="contador" id="contador">cargando…</span>
+</header>
+<button class="chat-fab" id="fab">💬</button>
+<div class="chat-win" id="win" style="display:none">
+  <div class="chat-head">
+    <div class="t">Copiloto de arriendos<small>🔧 demo · inundación GORE + micros GTFS</small></div>
+    <button id="cerrar" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="chat-cuerpo" id="cuerpo"></div>
+  <div class="chips" id="chips"></div>
+  <form class="chat-input" id="form">
+    <input id="entrada" placeholder="Ej: 3 dormitorios bajo 500 en Puente Alto sin riesgo…" autocomplete="off">
+    <button type="submit">➤</button>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="datos.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const fmt = n => '$' + n.toLocaleString('es-CL');
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const COLOR = {alto:'#FF5D4D',medio:'#FFC53D',atento:'#6EA8C9',bajo:'#3FD68F'};
+const ORDEN = {bajo:0,atento:1,medio:2,alto:3};
+const colorCausa = c => {c=norm(c); return c.includes('cauce')?'#2F86D6':c.includes('colector')?'#8F7BF0':(c.includes('quebrada')||c.includes('aluvi'))?'#C9834F':'#41C6E0';};
+
+/* ── Motor de propiedades (portado del PropiedadesService del backend) ── */
+function scoreLoco(t){
+  if(!t||t.metro_m==null) return null;
+  let s=0,m=t.metro_m;
+  s+= m<=600?35:m<=1000?30:m<=1600?22:m<=2600?12:4;
+  s+= Math.min(30,(t.n_recorridos||0)*2.5);
+  s+= Math.min(20,(t.buses_hora_punta||0)/6);
+  const pm=t.paradero_min_m;
+  s+= pm==null?0:pm<=250?15:pm<=400?10:pm<=600?5:0;
+  return Math.round(Math.min(100,s));
+}
+const comunas = () => Object.keys(DATOS.meta.medianas_pxm);
+function buscar(f){
+  const q=norm(f.texto||'');
+  const res=DATOS.casas.filter(c=>{
+    if(f.precio_max&&c.precio>f.precio_max)return false;
+    if(f.precio_min&&c.precio<f.precio_min)return false;
+    if(f.dormitorios_min&&c.dorm<f.dormitorios_min)return false;
+    if(f.comuna&&norm(c.comuna)!==norm(f.comuna))return false;
+    if(f.riesgo_maximo&&ORDEN[c.r.nivel]>ORDEN[f.riesgo_maximo])return false;
+    if(f.locomocion_min&&(scoreLoco(c.t)||0)<f.locomocion_min)return false;
+    if(q&&!norm(`${c.sector} ${c.comuna} ${c.nota}`).includes(q))return false;
+    return true;
+  });
+  return {total:res.length,casas:res};
+}
+function informe(id){ return DATOS.casas.find(c=>c.id===id); }
+function estadZona(comuna){
+  const cs=DATOS.casas.filter(c=>norm(c.comuna)===norm(comuna));
+  if(!cs.length)return null;
+  const precios=cs.map(c=>c.precio).sort((a,b)=>a-b);
+  const riesgo={},recs={};
+  cs.forEach(c=>{riesgo[c.r.nivel]=(riesgo[c.r.nivel]||0)+1;(c.t?.recorridos||[]).forEach(r=>recs[r]=(recs[r]||0)+1);});
+  return {comuna:cs[0].comuna,total:cs.length,precio_mediano:precios[Math.floor(precios.length/2)],
+    mediana:DATOS.meta.medianas_pxm[cs[0].comuna],riesgo,
+    recs:Object.entries(recs).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([r])=>r),
+    pc:DATOS.pc.filter(p=>norm(p.comuna)===norm(comuna)).length,
+    centro:{lat:cs.reduce((s,c)=>s+c.lat,0)/cs.length,lon:cs.reduce((s,c)=>s+c.lon,0)/cs.length}};
+}
+
+/* ── Motor conversacional (portado del ModoBasicoService) ── */
+function responder(mensaje){
+  const t=norm(mensaje), acciones=[];
+  const mId=t.match(/(?:casa|id|informe|detalle|ficha)\D{0,12}(\d{1,3})/);
+  if(mId){
+    const d=informe(Number(mId[1]));
+    if(!d)return {respuesta:`No existe la casa id=${mId[1]}.`,tools:[],acciones};
+    acciones.push({tipo:'volar',lat:d.lat,lon:d.lon,zoom:16,id:d.id});
+    const r=d.r,l=d.t||{},s=scoreLoco(l);
+    const resp=`📋 ${d.sector}, ${d.comuna} — ${fmt(d.precio)}/mes · ${d.dorm}D/${d.banos}B · ${d.m2} m²\n`+
+      `💧 Riesgo invierno: ${r.nivel.toUpperCase()} (punto crítico a ${r.pc_m} m: ${r.pc_sector} — ${r.pc_causa.toLowerCase()})`+
+      (r.canal?` · ${r.canal} a ${r.canal_m} m`:'')+`\n`+
+      `🚌 Locomoción ${s??'s/d'}/100: ${l.n_recorridos??'—'} recorridos, ${l.buses_hora_punta??'—'} buses/h punta, Metro ${l.metro_est??'—'} a ${l.metro_m??'—'} m\n`+
+      `💰 ${d.pxm?fmt(d.pxm)+'/m²':'s/d'} (mediana ${d.comuna}: ${DATOS.meta.medianas_pxm[d.comuna]?fmt(DATOS.meta.medianas_pxm[d.comuna])+'/m²':'s/d'})\n`+
+      `Te llevé a la casa en el mapa.`;
+    return {respuesta:resp,tools:['informe_critico'],acciones};
+  }
+  const comuna=comunas().find(c=>t.includes(norm(c)));
+  const esEstad=/(como es|conviene|informacion de|datos de|resumen de|que tal)/.test(t);
+  const esBusq=/(casa|depto|arriendo|dormitorio|busca|muestra|filtra|bajo|hasta|menos de|sobre|barat|\dd|\d)/.test(t);
+  if(comuna&&esEstad&&!esBusq){
+    const d=estadZona(comuna);
+    acciones.push({tipo:'centrar',lat:d.centro.lat,lon:d.centro.lon,zoom:13});
+    const riesgo=Object.entries(d.riesgo).map(([k,v])=>`${v} ${k}`).join(', ');
+    const resp=`📊 ${d.comuna}: ${d.total} avisos · precio mediano ${fmt(d.precio_mediano)}${d.mediana?' · '+fmt(d.mediana)+'/m²':''}\n`+
+      `💧 Riesgo de los avisos: ${riesgo} · ${d.pc} puntos críticos de lluvia en la comuna\n`+
+      `🚌 Recorridos frecuentes: ${d.recs.join(', ')||'s/d'}\nCentré el mapa en la comuna.`;
+    return {respuesta:resp,tools:['estadisticas_zona'],acciones};
+  }
+  const f={};
+  if(comuna)f.comuna=comuna;
+  const mDorm=t.match(/(\d)\s*(?:d\b|dorm|habitacion|pieza)/);
+  if(mDorm)f.dormitorios_min=Number(mDorm[1]);
+  const nums=[...t.matchAll(/(\d[\d.,]*)\s*(millon|millones|mil|lucas)?/g)].map(m=>{
+    let n=Number(m[1].replace(/[.,]/g,''));
+    if(/millon/.test(m[2]||''))n*=1e6; else if(/(mil|lucas)/.test(m[2]||''))n*=1000; else if(n<1000)n*=1000;
+    return n;
+  }).filter(n=>n>=100000&&n<=5e6&&(!f.dormitorios_min||n!==f.dormitorios_min*1000));
+  if(nums.length&&/(bajo|hasta|menos|max|tope|presupuesto)/.test(t))f.precio_max=Math.max(...nums);
+  else if(nums.length&&/(sobre|desde|mas de|minimo)/.test(t))f.precio_min=Math.min(...nums);
+  else if(nums.length)f.precio_max=Math.max(...nums);
+  if(/(sin riesgo|no se inund|seguras?|secas?|sin inundacion)/.test(t))f.riesgo_maximo='bajo';
+  if(/(bien conectad|buena locomocion|con micros|cerca del metro|conectividad)/.test(t))f.locomocion_min=55;
+  if(/barat/.test(t)&&!f.precio_max)f.precio_max=450000;
+  if(!Object.keys(f).length){
+    return {respuesta:'Puedo ayudarte así:\n• "3 dormitorios bajo 500 en Puente Alto sin riesgo"\n• "casas baratas bien conectadas en La Florida"\n• "¿cómo es La Cisterna?"\n• "informe de la casa 2"',tools:[],acciones};
+  }
+  const res=buscar(f);
+  if(!res.total)return {respuesta:'No encontré casas con esos filtros 😕 Prueba subiendo el presupuesto o quitando una condición.',tools:['buscar_casas'],acciones:[{tipo:'filtrar',ids:[]}]};
+  acciones.push({tipo:'filtrar',ids:res.casas.map(c=>c.id)});
+  const top=res.casas.slice(0,3).map(c=>`• #${c.id} ${fmt(c.precio)} — ${c.sector}, ${c.comuna} (${c.dorm}D, 💧${c.r.nivel}, 🚌${scoreLoco(c.t)??'s/d'})`).join('\n');
+  const ftxt=[f.comuna,f.dormitorios_min&&`${f.dormitorios_min}+ dorm`,f.precio_max&&`hasta ${fmt(f.precio_max)}`,f.riesgo_maximo&&'sin riesgo de inundación',f.locomocion_min&&'bien conectadas'].filter(Boolean).join(' · ');
+  return {respuesta:`🔎 ${res.total} casas (${ftxt}). Destacadas:\n${top}\nTe las dejé filtradas en el mapa — pide "informe de la casa N" para el detalle.`,tools:['buscar_casas'],acciones};
+}
+
+/* ── Mapa ── */
+if(typeof L==='undefined'){
+  document.getElementById('estado-sub').innerHTML='⚠️ No se pudo cargar Leaflet.<br>Revisa tu conexión a internet y recarga la página.';
+}
+const map=L.map('mapa',{zoomControl:false}).setView([-33.55,-70.6],12);
+L.control.zoom({position:'bottomright'}).addTo(map);
+const tiles=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap · CARTO · GORE RM · DTPM',maxZoom:19});
+let tileOk=false;
+tiles.on('load',()=>{tileOk=true;const e=document.getElementById('estado');if(e)e.style.display='none';});
+tiles.on('tileerror',()=>{
+  if(!tileOk){tiles.remove();
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+    document.getElementById('estado-sub').textContent='usando servidor alternativo…';
+  }
+});
+tiles.addTo(map);
+// respaldo: ocultar overlay igual tras 3s aunque el evento load no dispare
+setTimeout(()=>{const e=document.getElementById('estado');if(e)e.style.display='none';},3000);
+const gMarcas=L.layerGroup().addTo(map), gInund=L.layerGroup().addTo(map);
+
+Object.entries(DATOS.canales||{}).forEach(([nom,segs])=>segs.forEach(seg=>{
+  if(seg.length>1)L.polyline(seg,{color:'#41C6E0',weight:3,opacity:.85,className:'canal-anim'}).bindTooltip(nom,{sticky:true}).addTo(gInund);
+}));
+DATOS.pc.forEach(p=>{
+  const color=colorCausa(p.causa);
+  const ic=L.divIcon({className:'',iconSize:[16,16],html:`<div class="pulso" style="--co:${color}66"><i style="background:${color}"></i></div>`});
+  L.marker([p.lat,p.lon],{icon:ic}).bindPopup(`<b>${p.sector}</b><br>${p.causa}<br><small>${p.comuna} · ${DATOS.meta.fuente_pc}</small>`).addTo(gInund);
+});
+(DATOS.lineas||[]).forEach(l=>l.tramos.forEach(tr=>{if(tr.length>1)L.polyline(tr,{color:l.color,weight:2.5,opacity:.7}).addTo(gInund);}));
+DATOS.metro.forEach(m=>L.circleMarker([m.lat,m.lon],{radius:3.5,color:'#fff',weight:1.5,fillColor:'#111',fillOpacity:1}).bindTooltip(m.name).addTo(gInund));
+
+let idsVisibles=null;
+function pintarCasas(){
+  gMarcas.clearLayers();
+  const set=idsVisibles?new Set(idsVisibles):null;
+  DATOS.casas.filter(c=>!set||set.has(c.id)).forEach(c=>{
+    L.circleMarker([c.lat,c.lon],{radius:7,color:'#0B1620',weight:2,fillColor:COLOR[c.r.nivel],fillOpacity:.95})
+      .bindTooltip(`${fmt(c.precio)} · ${c.dorm}D · 💧${c.r.nivel}`)
+      .on('click',()=>{enviar(`informe de la casa ${c.id}`);})
+      .addTo(gMarcas);
+  });
+  $('#contador').textContent=`${idsVisibles?idsVisibles.length:DATOS.casas.length} de ${DATOS.casas.length} avisos · mapa + copiloto`;
+}
+function ejecutar(a){
+  if(a.tipo==='filtrar'){idsVisibles=a.ids;pintarCasas();
+    if(a.ids.length){const b=L.latLngBounds(DATOS.casas.filter(c=>a.ids.includes(c.id)).map(c=>[c.lat,c.lon]));map.flyToBounds(b.pad(0.2),{duration:.9});}}
+  if(a.tipo==='volar'||a.tipo==='centrar')map.flyTo([a.lat,a.lon],a.zoom||14,{duration:.9});
+}
+pintarCasas();
+setTimeout(()=>map.invalidateSize(),300);
+window.addEventListener('resize',()=>map.invalidateSize());
+
+/* ── Chat UI ── */
+function burbuja(rol,texto,tools){
+  const d=document.createElement('div');d.className='msg '+rol;d.textContent=texto;
+  if(tools&&tools.length){const s=document.createElement('div');s.className='tools';s.textContent='⚙ '+tools.join(' · ');d.appendChild(s);}
+  $('#cuerpo').appendChild(d);$('#cuerpo').scrollTop=$('#cuerpo').scrollHeight;
+}
+function enviar(texto){
+  if(!texto.trim())return;
+  burbuja('usuario',texto);
+  setTimeout(()=>{
+    const r=responder(texto);
+    burbuja('asistente',r.respuesta,r.tools);
+    (r.acciones||[]).forEach(ejecutar);
+  },250);
+}
+$('#form').addEventListener('submit',e=>{e.preventDefault();const v=$('#entrada').value;$('#entrada').value='';enviar(v);});
+$('#cerrar').onclick=()=>{$('#win').style.display='none';$('#fab').style.display='block';};
+$('#fab').onclick=()=>{$('#win').style.display='flex';$('#fab').style.display='none';};
+
+const SUGERENCIAS=['3D bajo 500 en Puente Alto sin riesgo','baratas bien conectadas en La Florida','¿cómo es La Cisterna?','informe de la casa 2'];
+SUGERENCIAS.forEach(s=>{const b=document.createElement('button');b.className='chip';b.textContent=s;b.onclick=()=>enviar(s);$('#chips').appendChild(b);});
+burbuja('asistente','Hola 👋 Soy tu copiloto de arriendos. Pídeme casas y muevo el mapa por ti — tengo datos de inundación (GORE RM) y micros reales (GTFS) que ningún portal tiene. Prueba los botones de abajo 👇');
+</script>
+</body>
+</html>
