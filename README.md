@@ -12,6 +12,24 @@ Usuario ─ chat ─▶ POST /api/ai/chat
               { respuesta, acciones[] } ─▶ el mapa las ejecuta
 ```
 
+## ▶️ Levantar todo (Windows)
+
+Doble clic en **`INICIAR.bat`** (levanta API + web y abre el navegador).
+
+Primera vez:
+```bash
+cd backend  && npm install --include=dev && npm run build
+cd frontend && npm install --include=dev && npm run build
+```
+
+> **Windows con problemas de npm**: si `npm install` falla con
+> `ERR_INVALID_ARG_TYPE: The "file" argument must be of type string`, es que la
+> variable **`ComSpec`** está vacía (npm no puede lanzar procesos hijos).
+> Solución: `set ComSpec=C:\Windows\System32\cmd.exe`.
+> Y si `NODE_ENV=production` está fijo en el sistema, npm omite las
+> devDependencies (no instala vite ni el CLI de Nest): usa `--include=dev`.
+> `INICIAR.bat` ya corrige ambas cosas por sesión.
+
 ## 🧠 Motor de IA (DeepSeek · Kimi · Claude)
 
 El copiloto usa **function calling** real: el modelo elige la herramienta, el backend la ejecuta contra los datos y devuelve **datos + una acción para el mapa**.
