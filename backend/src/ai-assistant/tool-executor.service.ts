@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PropiedadesService, FiltrosBusqueda } from '../propiedades/propiedades.service';
 
 export interface AccionMapa {
-  tipo: 'filtrar' | 'volar' | 'centrar';
+  tipo: 'filtrar' | 'volar' | 'centrar' | 'alerta';
+  alerta?: any;
   ids?: number[];
   lat?: number;
   lon?: number;
@@ -18,7 +19,14 @@ export interface ResultadoTool {
 /** Calcado del tool-executor.service.ts de CotizadorIA: un switch que ejecuta la tool y arma la acción. */
 @Injectable()
 export class ToolExecutorService {
+  /** Alertas en memoria (F2: pasan a Supabase con el perfil del usuario) */
+  private alertas: any[] = [];
+
   constructor(private readonly propiedades: PropiedadesService) {}
+
+  listarAlertas() {
+    return this.alertas;
+  }
 
   ejecutar(nombre: string, input: any): ResultadoTool {
     switch (nombre) {
@@ -44,6 +52,18 @@ export class ToolExecutorService {
           ? { tipo: 'centrar', lat: est.centro.lat, lon: est.centro.lon, zoom: 13 }
           : undefined;
         return { datos: est, accion };
+      }
+      case 'crear_alerta': {
+        const alerta = {
+          id: 'a_' + Date.now().toString(36),
+          nombre: input.nombre,
+          filtros: input.filtros ?? {},
+          email: input.email ?? null,
+          creada: new Date().toISOString(),
+          coincidencias_hoy: this.propiedades.buscar(input.filtros ?? {}).total,
+        };
+        this.alertas.push(alerta);
+        return { datos: { guardada: true, ...alerta }, accion: { tipo: 'alerta', alerta } as any };
       }
       default:
         return { datos: { error: `Tool desconocida: ${nombre}` } };

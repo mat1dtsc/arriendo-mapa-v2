@@ -4,10 +4,10 @@ import ChatMessage from './ChatMessage';
 import { EstadoIA } from '../../api';
 
 const SUGERENCIAS = [
-  '3D bajo 500 en Puente Alto sin riesgo',
-  'baratas bien conectadas',
-  '¿cómo es La Florida?',
-  'ficha de la casa 2',
+  'Busco casa 3D bajo 500 que no se inunde',
+  '¿Qué comuna me conviene?',
+  'Avísame si aparece algo así',
+  'Compara La Florida con Puente Alto',
 ];
 
 interface Props {
@@ -26,8 +26,8 @@ export default function ChatWindow({ mensajes, cargando, enviar, estado, onCerra
   return (
     <div className="chat open">
       <div className="ch-head">
-        <div className="t">Copiloto
-          <small>{basico ? '🔧 modo básico · sin clave IA' : `✨ ${estado!.etiqueta}`} · inundación GORE + micros GTFS</small>
+        <div className="t">Tu agente de arriendos
+          <small>{basico ? '🔧 modo básico · sin clave IA' : `✨ ${estado!.etiqueta}`} · busca, filtra y te avisa</small>
         </div>
         <button onClick={onCerrar} aria-label="Cerrar">✕</button>
       </div>

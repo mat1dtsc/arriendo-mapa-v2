@@ -7,7 +7,7 @@ export interface Mensaje { rol: 'usuario' | 'asistente'; texto: string; tools?: 
 export function useAiChat(onAcciones: (a: AccionMapa[]) => void) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([{
     rol: 'asistente',
-    texto: 'Hola 👋 Busco por ti con datos que ningún portal tiene: riesgo de inundación calle por calle y micros reales del GTFS. Pídeme algo o toca una píldora de precio en el mapa.',
+    texto: 'Hola 👋 Soy tu agente de arriendos. No eres tú quien busca: dime qué necesitas y yo recorro el catálogo por ti.\n\nVeo lo que los portales no te muestran: qué calles se anegan en invierno y qué micros pasan de verdad por la puerta. Si aún no aparece lo tuyo, te dejo una alerta y te aviso cuando aparezca.',
   }]);
   const [cargando, setCargando] = useState(false);
   const [estado, setEstado] = useState<EstadoIA | null>(null);

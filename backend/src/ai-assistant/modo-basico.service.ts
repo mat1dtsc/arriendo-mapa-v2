@@ -32,7 +32,7 @@ export class ModoBasicoService {
   responder(mensaje: string): { respuesta: string; acciones: AccionMapa[]; tools_usadas: string[]; modo: 'basico' } {
     const t = this.norm(mensaje);
     const acciones: AccionMapa[] = [];
-    const pie = '\n\n🔧 Modo básico (sin IA). Agrega tu ANTHROPIC_API_KEY en backend/.env para el copiloto inteligente.';
+    const pie = '\n\n🔧 Modo básico (sin IA). Agrega DEEPSEEK_API_KEY en backend/.env para el agente conversacional completo.';
 
     // ── ¿Informe de una casa por id? ──
     const mId = t.match(/(?:casa|id|informe|detalle|ficha)\D{0,12}(\d{1,3})/);

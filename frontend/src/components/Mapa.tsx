@@ -22,6 +22,7 @@ export default function Mapa({ casas, capas, idsVisibles, seleccion, orden, onSe
   const pins = useRef<Map<number, maplibregl.Marker>>(new Map());
   const els = useRef<Map<number, HTMLDivElement>>(new Map());
   const listo = useRef(false);
+  const anim = useRef<number | null>(null);
   const cbSel = useRef(onSeleccion);
   cbSel.current = onSeleccion;
   const cbListo = useRef(onListo);
@@ -50,6 +51,7 @@ export default function Mapa({ casas, capas, idsVisibles, seleccion, orden, onSe
       pins.current.clear();
       els.current.clear();
       listo.current = false;
+      if (anim.current) { clearInterval(anim.current); anim.current = null; }
     };
     // deps vacías a propósito: el mapa se crea una sola vez.
     // Los callbacks van por ref para no recrearlo en cada render de App.
@@ -59,6 +61,45 @@ export default function Mapa({ casas, capas, idsVisibles, seleccion, orden, onSe
   useEffect(() => {
     const m = map.current;
     if (!m || !capas || !listo.current || m.getSource('flood')) return;
+    // ── Calles que se anegan: tramos reales de OSM, animados como agua ──
+    const COLOR_CAUSA: Record<string, string> = {
+      cauce: '#2F86D6', colector: '#9B8CFF', quebrada: '#C9834F', anegamiento: '#3ED8F0',
+    };
+    m.addSource('calles', { type: 'geojson', data: fc((capas.calles || []).map((t: any) => ({
+      type: 'Feature',
+      properties: { g: t.g, color: COLOR_CAUSA[t.g] || '#3ED8F0', sector: t.s, comuna: t.k, calle: t.n },
+      geometry: { type: 'LineString', coordinates: t.c },
+    }))) });
+    // halo ancho difuso = "la calle se llena de agua"
+    m.addLayer({ id: 'calles-glow', type: 'line', source: 'calles', minzoom: 10.5,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': ['get', 'color'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 8, 16, 30],
+        'line-blur': ['interpolate', ['linear'], ['zoom'], 11, 6, 16, 18],
+        'line-opacity': 0.45 } } as any);
+    // cuerpo del agua
+    m.addLayer({ id: 'calles-body', type: 'line', source: 'calles', minzoom: 10.5,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': ['get', 'color'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 16, 11],
+        'line-opacity': 0.9 } } as any);
+    // corriente animada
+    m.addLayer({ id: 'calles-flow', type: 'line', source: 'calles', minzoom: 11.5,
+      layout: { 'line-cap': 'butt' },
+      paint: { 'line-color': '#EAFBFF',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1, 16, 4],
+        'line-opacity': 0.65, 'line-dasharray': [0, 4, 3] } } as any);
+
+    m.on('click', 'calles-body', (e: any) => {
+      const p = e.features[0].properties;
+      new maplibregl.Popup({ closeButton: false, offset: 8 }).setLngLat(e.lngLat)
+        .setHTML('<div style="font:600 11.5px Archivo,sans-serif;color:#0b1620">💧 <b>' +
+          (p.calle || 'Calle sin nombre') + '</b><br>Se anega: ' + p.sector +
+          '<br><span style="opacity:.6">' + p.comuna + ' · fuente GORE RM</span></div>').addTo(m);
+    });
+    m.on('mouseenter', 'calles-body', () => { m.getCanvas().style.cursor = 'pointer'; });
+    m.on('mouseleave', 'calles-body', () => { m.getCanvas().style.cursor = ''; });
+
     m.addSource('flood', { type: 'geojson', data: fc((capas.pc || []).map((p: any) => ({
       type: 'Feature', properties: { causa: p.causa, sector: p.sector, comuna: p.comuna },
       geometry: { type: 'Point', coordinates: [p.lon, p.lat] } }))) });
@@ -69,9 +110,9 @@ export default function Mapa({ casas, capas, idsVisibles, seleccion, orden, onSe
         0, 'rgba(0,40,60,0)', 0.2, 'rgba(20,120,180,.35)', 0.45, 'rgba(62,180,240,.5)',
         0.7, 'rgba(120,200,255,.6)', 1, 'rgba(200,240,255,.75)'],
       'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 9, 18, 15, 55],
-      'heatmap-opacity': 0.85 } } as any);
-    m.addLayer({ id: 'flood-pt', type: 'circle', source: 'flood', minzoom: 11.5, paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11.5, 2.5, 16, 6],
+      'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0.8, 13, 0.25, 14.5, 0] } } as any);
+    m.addLayer({ id: 'flood-pt', type: 'circle', source: 'flood', minzoom: 12.5, paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 12.5, 2, 16, 4],
       'circle-color': '#8FE4FF', 'circle-blur': 0.25,
       'circle-opacity': ['interpolate', ['linear'], ['zoom'], 11.5, 0.35, 14, 0.95],
       'circle-stroke-width': 1, 'circle-stroke-color': 'rgba(160,230,255,.4)' } } as any);
@@ -110,6 +151,21 @@ export default function Mapa({ casas, capas, idsVisibles, seleccion, orden, onSe
     });
     m.on('mouseenter', 'flood-pt', () => { m.getCanvas().style.cursor = 'pointer'; });
     m.on('mouseleave', 'flood-pt', () => { m.getCanvas().style.cursor = ''; });
+
+    // corriente: dasharray animado = sensación de agua bajando por la calle
+    const SEQ: number[][] = [
+      [0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1],
+      [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5], [0, 1, 3, 3], [0, 1.5, 3, 2.5],
+      [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5],
+    ];
+    let paso = 0;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (!reduce) {
+      anim.current = window.setInterval(() => {
+        paso = (paso + 1) % SEQ.length;
+        if (m.getLayer('calles-flow')) m.setPaintProperty('calles-flow', 'line-dasharray', SEQ[paso]);
+      }, 90);
+    }
   }, [capas]);
 
   useEffect(() => {
@@ -139,7 +195,7 @@ export default function Mapa({ casas, capas, idsVisibles, seleccion, orden, onSe
     if (!m) return;
     (window as any).__toggleCapa = (capa: string, on: boolean) => {
       const ids: Record<string, string[]> = {
-        flood: ['flood-heat', 'flood-pt', 'canal', 'canal-glow'],
+        flood: ['calles-glow', 'calles-body', 'calles-flow', 'flood-heat', 'flood-pt', 'canal', 'canal-glow'],
         metro: ['metro', 'mest'], stops: ['stops'],
       };
       (ids[capa] || []).forEach((i) => { if (m.getLayer(i)) m.setLayoutProperty(i, 'visibility', on ? 'visible' : 'none'); });

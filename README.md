@@ -67,10 +67,12 @@ El **mapa es la portada**: MapLibre GL vectorial oscuro con inclinación 3D, pí
 | `AiChatbot.jsx` + `useAiChat.js` | `ChatWindow.tsx` + `useAiChat.ts` (badge del motor activo) |
 | Pinecone RAG | F3: pgvector en Supabase |
 
+**Agente, no buscador**: el chat se presenta como un agente que trabaja para el usuario — compara comunas, advierte riesgos sin que se los pregunten y ofrece **dejar una alerta** (`crear_alerta`) cuando todavía no hay nada que calce. Además hay un **buscador con menús desplegables** (tipo, comuna, precio, dormitorios, baños, m², riesgo, locomoción y amenidades) con vista previa de resultados en vivo.
+
 **El twist propio**: cada tool devuelve `datos` (para el LLM) **y** `accion` (para el mapa). El chat no solo responde: mueve, filtra y vuela el mapa.
 
 ## Datos únicos (ya precalculados en `backend/data/datos.json`)
-- 💧 **Riesgo de invierno**: 154 puntos críticos oficiales geocodificados (GORE RM, 14-jul-2026) + canales San Carlos y Zanjón de la Aguada → nivel por propiedad.
+- 💧 **Calles que se anegan**: 423 **tramos de calle reales** (geometría OSM) derivados de los 154 puntos críticos oficiales del GORE RM (14-jul-2026), animados como corriente de agua y coloreados por causa (desborde de cauce, colector colapsado, quebrada, anegamiento). El riesgo de cada propiedad se calcula por **distancia al tramo**, no al punto.
 - 🚌 **Locomoción real**: recorridos de micros, buses/hora punta, paradero y Metro más cercanos (GTFS Red Movilidad DTPM, 04-jul-2026) → score 0-100.
 - 💰 Precio $/m² vs mediana comunal. 136 avisos reales.
 

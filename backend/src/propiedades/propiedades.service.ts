@@ -8,9 +8,13 @@ export interface FiltrosBusqueda {
   precio_max?: number;
   precio_min?: number;
   dormitorios_min?: number;
+  banos_min?: number;
+  m2_min?: number;
+  tipo?: 'casa' | 'departamento' | 'todos';
   comuna?: string;
   riesgo_maximo?: NivelRiesgo;
   locomocion_min?: number;
+  amenidades?: string[];
   texto?: string;
 }
 
@@ -47,6 +51,7 @@ export class PropiedadesService {
       m2: c.m2,
       sector: c.sector,
       comuna: c.comuna,
+      tipo: c.tipo ?? 'casa',
       lat: c.lat,
       lon: c.lon,
       riesgo: c.r.nivel,
@@ -61,6 +66,10 @@ export class PropiedadesService {
       if (f.precio_max && c.precio > f.precio_max) return false;
       if (f.precio_min && c.precio < f.precio_min) return false;
       if (f.dormitorios_min && c.dorm < f.dormitorios_min) return false;
+      if (f.banos_min && c.banos < f.banos_min) return false;
+      if (f.m2_min && (c.m2 ?? 0) < f.m2_min) return false;
+      if (f.tipo && f.tipo !== 'todos' && (c.tipo ?? 'casa') !== f.tipo) return false;
+      if (f.amenidades?.length && !f.amenidades.every((a) => c.amen?.[a])) return false;
       if (f.comuna && c.comuna.toLowerCase() !== f.comuna.toLowerCase()) return false;
       if (f.riesgo_maximo && ORDEN_RIESGO[c.r.nivel as NivelRiesgo] > ORDEN_RIESGO[f.riesgo_maximo]) return false;
       if (f.locomocion_min && (this.scoreLocomocion(c.t) || 0) < f.locomocion_min) return false;
@@ -91,6 +100,11 @@ export class PropiedadesService {
           distancia_m: c.r.pc_m,
           ubicacion_aproximada: c.r.pc_aprox,
         },
+        calle_inundable_mas_cercana: c.r.calle_m != null ? {
+          distancia_m: c.r.calle_m,
+          nombre: c.r.calle_nombre || null,
+          sector: c.r.calle_sector || null,
+        } : null,
         canal_cercano: c.r.canal ? { nombre: c.r.canal, distancia_m: c.r.canal_m } : null,
         fuente: this.datos.meta.fuente_pc,
       },
@@ -140,9 +154,29 @@ export class PropiedadesService {
     };
   }
 
-  /** Capas para el mapa: puntos críticos, canales, metro, paraderos */
+  /** Capas para el mapa: calles inundables, puntos críticos, canales, metro, paraderos */
   capas() {
     const { pc, canales, metro, lineas, paraderos, meta } = this.datos;
-    return { pc, canales, metro, lineas, paraderos, meta };
+    return { pc, canales, metro, lineas, paraderos, meta, calles: this.datos.calles_inundadas ?? [] };
+  }
+
+  /** Opciones para los menús de búsqueda */
+  opciones() {
+    const casas = this.datos.casas;
+    const precios = casas.map((c: any) => c.precio).sort((a: number, b: number) => a - b);
+    return {
+      comunas: [...new Set(casas.map((c: any) => c.comuna))].sort(),
+      tipos: [...new Set(casas.map((c: any) => c.tipo ?? 'casa'))],
+      precio_min: precios[0],
+      precio_max: precios[precios.length - 1],
+      dormitorios: [...new Set(casas.map((c: any) => c.dorm))].sort((a: number, b: number) => a - b),
+      amenidades: [
+        { id: 'estac', label: 'Estacionamiento' },
+        { id: 'mascotas', label: 'Acepta mascotas' },
+        { id: 'piscina', label: 'Piscina' },
+        { id: 'condominio', label: 'Condominio' },
+      ],
+      total: casas.length,
+    };
   }
 }
