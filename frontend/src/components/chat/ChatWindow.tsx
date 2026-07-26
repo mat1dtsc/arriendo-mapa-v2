@@ -1,29 +1,47 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Mensaje } from '../../hooks/useAiChat';
 import ChatMessage from './ChatMessage';
+import { EstadoIA } from '../../api';
 
-interface Props { mensajes: Mensaje[]; cargando: boolean; enviar: (t: string) => void; onCerrar: () => void; modo: 'ia' | 'basico' | null; }
+const SUGERENCIAS = [
+  '3D bajo 500 en Puente Alto sin riesgo',
+  'baratas bien conectadas',
+  '¿cómo es La Florida?',
+  'ficha de la casa 2',
+];
 
-export default function ChatWindow({ mensajes, cargando, enviar, onCerrar, modo }: Props) {
+interface Props {
+  mensajes: Mensaje[]; cargando: boolean; enviar: (t: string) => void;
+  estado: EstadoIA | null; onCerrar: () => void;
+}
+
+export default function ChatWindow({ mensajes, cargando, enviar, estado, onCerrar }: Props) {
   const [texto, setTexto] = useState('');
   const fin = useRef<HTMLDivElement>(null);
   useEffect(() => { fin.current?.scrollIntoView({ behavior: 'smooth' }); }, [mensajes, cargando]);
 
   const onSubmit = (e: FormEvent) => { e.preventDefault(); enviar(texto); setTexto(''); };
+  const basico = !estado || estado.activo === 'basico';
 
   return (
-    <div className="chat-win">
-      <div className="chat-head">
-        <div className="t">Copiloto de arriendos<small>{modo === 'basico' ? '🔧 modo básico — sin clave IA' : modo === 'ia' ? '✨ con IA · inundación GORE + micros GTFS' : 'inundación GORE + micros GTFS'}</small></div>
+    <div className="chat open">
+      <div className="ch-head">
+        <div className="t">Copiloto
+          <small>{basico ? '🔧 modo básico · sin clave IA' : `✨ ${estado!.etiqueta}`} · inundación GORE + micros GTFS</small>
+        </div>
         <button onClick={onCerrar} aria-label="Cerrar">✕</button>
       </div>
-      <div className="chat-cuerpo">
+      <div className="ch-body">
         {mensajes.map((m, i) => <ChatMessage key={i} m={m} />)}
-        {cargando && <div className="escribiendo">consultando datos…</div>}
+        {cargando && <div className="m a escribiendo"><span /><span /><span /></div>}
         <div ref={fin} />
       </div>
-      <form className="chat-input" onSubmit={onSubmit}>
-        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ej: 3 dormitorios bajo 500 en Puente Alto sin riesgo…" />
+      <div className="sug">
+        {SUGERENCIAS.map((s) => <button key={s} onClick={() => enviar(s)} disabled={cargando}>{s}</button>)}
+      </div>
+      <form className="ch-in" onSubmit={onSubmit}>
+        <input value={texto} onChange={(e) => setTexto(e.target.value)}
+          placeholder="3 dormitorios bajo 500 sin riesgo…" autoComplete="off" />
         <button type="submit" disabled={cargando || !texto.trim()}>➤</button>
       </form>
     </div>

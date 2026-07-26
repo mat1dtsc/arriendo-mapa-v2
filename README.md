@@ -12,14 +12,41 @@ Usuario ─ chat ─▶ POST /api/ai/chat
               { respuesta, acciones[] } ─▶ el mapa las ejecuta
 ```
 
+## 🧠 Motor de IA (DeepSeek · Kimi · Claude)
+
+El copiloto usa **function calling** real: el modelo elige la herramienta, el backend la ejecuta contra los datos y devuelve **datos + una acción para el mapa**.
+
+| Proveedor | Modelo por defecto | Variable en `.env` | Costo aprox. |
+|---|---|---|---|
+| **DeepSeek** (recomendado) | `deepseek-v4-flash` | `DEEPSEEK_API_KEY` | ~USD 0,14 / 1M tokens |
+| **Kimi** (Moonshot) | `kimi-k2.6` | `MOONSHOT_API_KEY` | mayor |
+| **Claude** | `claude-sonnet-4-6` | `ANTHROPIC_API_KEY` | mayor |
+| **Modo básico** | reglas, sin IA | — | gratis |
+
+```bash
+cd backend && cp .env.example .env
+# pega DEEPSEEK_API_KEY=sk-...  (o MOONSHOT_API_KEY)
+```
+
+- Sin ninguna clave, el chat **igual funciona** en modo básico (parser de reglas con las mismas herramientas).
+- Si el proveedor falla, cae solo a modo básico — nunca se rompe el chat.
+- `LLM_BASE_URL` permite apuntar a **Ollama local** u otro gateway OpenAI-compatible.
+- `GET /api/ai/estado` dice qué motor está activo (la UI lo muestra en el chat).
+
+> ⚠️ `deepseek-chat` y `deepseek-reasoner` fueron **retirados el 24-jul-2026**. Este proyecto usa los nombres nuevos (`deepseek-v4-flash` / `deepseek-v4-pro`).
+
+## 🗺️ La app
+
+El **mapa es la portada**: MapLibre GL vectorial oscuro con inclinación 3D, píldoras de precio por propiedad (color = riesgo de inundación), inundación como mapa de calor, canales, Metro y paraderos conmutables. El copiloto es un panel flotante que **controla el mapa**: filtra, vuela y centra según lo que pidas.
+
 ## El calco CotizadorIA → ArriendoMapa
 
 | CotizadorIA (Demian) | ArriendoMapa v2 |
 |---|---|
 | `tool-declarations.ts` (buscar_productos, ficha técnica…) | `tool-declarations.ts` (buscar_casas, informe_critico, estadisticas_zona) |
 | `tool-executor.service.ts` → HANA/SQL | `tool-executor.service.ts` → datos.json (F2: Supabase/PostGIS) |
-| `claude-ai.service.ts` | `claude.service.ts` (loop agéntico + acciones de mapa) |
-| `AiChatbot.jsx` + `useAiChat.js` | `ChatWindow.tsx` + `useAiChat.ts` |
+| `claude-ai.service.ts` (multi-proveedor) | `llm.service.ts` — DeepSeek/Kimi (OpenAI-compat) + Claude + fallback |
+| `AiChatbot.jsx` + `useAiChat.js` | `ChatWindow.tsx` + `useAiChat.ts` (badge del motor activo) |
 | Pinecone RAG | F3: pgvector en Supabase |
 
 **El twist propio**: cada tool devuelve `datos` (para el LLM) **y** `accion` (para el mapa). El chat no solo responde: mueve, filtra y vuela el mapa.
