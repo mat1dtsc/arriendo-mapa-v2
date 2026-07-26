@@ -10,4 +10,10 @@ para navegadores sin WebGL. Los datos van en `datos.js` (136 avisos + 154 puntos
 3. Framework Preset: **Other** · sin build command · Output directory: dejar vacío
 4. Deploy
 
-Ver en local: abrir `index.html` con doble clic (requiere internet para los tiles del mapa).
+## Ver en local (servidor propio)
+- **Windows**: doble clic en `INICIAR.bat`
+- **Mac/Linux**: `./iniciar.sh` o `python3 servidor.py`
+- **XAMPP**: copiar esta carpeta a `C:\xampp\htdocs\arriendomapa` y abrir `http://localhost/arriendomapa/`
+
+El servidor busca un puerto libre (8000, 8080, 8888…), abre el navegador solo y no necesita instalar dependencias.
+También sirve abrir `index.html` con doble clic, pero por servidor es más fiable.
