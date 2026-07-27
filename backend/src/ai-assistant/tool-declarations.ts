@@ -67,7 +67,7 @@ export const TOOL_DECLARATIONS = [
       },
       required: ['nombre', 'filtros'],
     },
-  },,
+  },
   {
     name: 'reportar_calle_inundable',
     description:

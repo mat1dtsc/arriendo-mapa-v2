@@ -118,7 +118,9 @@ export class LlmService {
     const base = this.config.get<string>('LLM_BASE_URL') || cfg.base;
 
     // Las mismas declaraciones, en formato OpenAI
-    const tools = TOOL_DECLARATIONS.map((t) => ({
+    // filter(Boolean): una coma doble en el arreglo deja un hueco (undefined)
+    // y el proveedor rechaza el request completo con HTTP 400.
+    const tools = TOOL_DECLARATIONS.filter(Boolean).map((t) => ({
       type: 'function',
       function: { name: t.name, description: t.description, parameters: t.input_schema },
     }));
