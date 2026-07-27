@@ -77,12 +77,32 @@ export class ReportesService {
     return s.replace(/["\\]/g, '\\$&');
   }
 
+  /**
+   * Regex tolerante a tildes: nadie escribe "José Joaquín" con acentos al buscar.
+   * Convierte cada vocal en una clase que acepta ambas formas.
+   */
+  private patronFlexible(s: string) {
+    const eq: Record<string, string> = {
+      a: '[aáàäâ]', e: '[eéèëê]', i: '[iíìïî]', o: '[oóòöô]', u: '[uúùüû]', n: '[nñ]', c: '[cç]',
+    };
+    return this.escapar(s)
+      .split('')
+      .map((ch) => {
+        const base = ch
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase();
+        return eq[base] ?? ch;
+      })
+      .join('');
+  }
+
   /** Busca la geometría de la calle en OpenStreetMap dentro de la comuna */
   private async geometria(calle: string, comuna: string): Promise<number[][][]> {
     // Sin filtro de admin_level: es más lento de resolver en Overpass y provoca 504.
     const q = `[out:json][timeout:40];
-area["name"="${this.escapar(comuna)}"]["boundary"="administrative"]->.a;
-way(area.a)["highway"]["name"~"${this.escapar(calle)}",i];
+area["name"~"^${this.patronFlexible(comuna)}$",i]["boundary"="administrative"]->.a;
+way(area.a)["highway"]["name"~"${this.patronFlexible(calle)}",i];
 out geom;`;
     // Cada endpoint se prueba dos veces: Overpass devuelve 504 de forma intermitente.
     const intentos = [...ENDPOINTS, ...ENDPOINTS];
