@@ -34,8 +34,13 @@ export class ReportesService {
   constructor() {
     if (existsSync(this.ruta)) {
       try {
-        this.reportes = JSON.parse(readFileSync(this.ruta, 'utf8'));
-      } catch {
+        // Windows/PowerShell escribe UTF-8 con BOM y JSON.parse revienta:
+        // sin esto los reportes se perderían en silencio al editar el archivo.
+        const crudo = readFileSync(this.ruta, 'utf8').replace(/^\uFEFF/, '').trim();
+        const datos = crudo ? JSON.parse(crudo) : [];
+        this.reportes = Array.isArray(datos) ? datos : [datos];
+      } catch (e) {
+        this.logger.warn(`reportes.json ilegible, parto vacío: ${String(e).slice(0, 80)}`);
         this.reportes = [];
       }
     }
