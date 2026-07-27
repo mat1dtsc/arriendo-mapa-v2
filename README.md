@@ -30,6 +30,31 @@ cd frontend && npm install --include=dev && npm run build
 > devDependencies (no instala vite ni el CLI de Nest): usa `--include=dev`.
 > `INICIAR.bat` ya corrige ambas cosas por sesión.
 
+## 📥 Ingesta de avisos reales (API oficial Mercado Libre)
+
+El dataset scrapeado original arrastraba tres defectos: **una misma foto genérica en 128 de 136 avisos**,
+**enlaces a búsquedas por comuna** en vez de la publicación, y volumen congelado. La ingesta oficial los resuelve
+los tres de raíz: cada aviso trae sus propias fotos, su `permalink` directo y se puede repaginar cuando quieras.
+
+```bash
+# 1. Crear una app en https://developers.mercadolibre.cl y copiar credenciales a backend/.env
+#    MELI_CLIENT_ID=...
+#    MELI_CLIENT_SECRET=...
+
+cd backend
+python scripts/ingesta.py --descubrir          # ver filtros disponibles (operación, comuna, tipo)
+python scripts/ingesta.py --limite 300 --seco  # ensayo: reporta sin escribir
+python scripts/ingesta.py --limite 300         # ingesta real -> data/datos.json
+```
+
+La ingesta **enriquece cada aviso** con lo mismo que ya usa la app: nivel de riesgo por distancia al tramo de
+calle inundable, locomoción calculada desde el GTFS de Red Movilidad (descarga el feed la primera vez) y
+precio $/m² contra la mediana de su comuna. Solo usa librería estándar de Python, sin `pip install`.
+
+> Autenticación por `client_credentials`: basta la app, no hay flujo interactivo.
+> La búsqueda pública sin token devuelve **403** desde 2026, por eso las credenciales son obligatorias.
+> Scrapear los portales va contra sus términos: esta es la vía limpia.
+
 ## 🧠 Motor de IA (DeepSeek · Kimi · Claude)
 
 El copiloto usa **function calling** real: el modelo elige la herramienta, el backend la ejecuta contra los datos y devuelve **datos + una acción para el mapa**.
