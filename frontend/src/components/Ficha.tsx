@@ -75,7 +75,15 @@ export default function Ficha({ data: d, onCerrar }: { data: any; onCerrar: () =
           </div>
 
           {d.nota && <div className="rd" style={{ marginTop: 12, fontSize: 12 }}>{d.nota}</div>}
-          <a className="cta" href={d.link} target="_blank" rel="noopener noreferrer">Ver aviso original ↗</a>
+          <a className="cta" href={d.link} target="_blank" rel="noopener noreferrer">
+            {d.link_directo === false ? 'Buscar este aviso en Portal Inmobiliario ↗' : 'Ver aviso original ↗'}
+          </a>
+          {d.link_directo === false && (
+            <p className="cta-nota">
+              Este aviso no trae enlace directo, así que te llevo a la búsqueda ya filtrada
+              por <b>{d.comuna}</b>, <b>{d.dorm} dormitorios</b> y precio cercano a <b>{'$' + d.precio.toLocaleString('es-CL')}</b>.
+            </p>
+          )}
         </div>
       </div>
     </aside>
