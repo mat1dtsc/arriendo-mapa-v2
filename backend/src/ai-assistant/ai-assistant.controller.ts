@@ -12,6 +12,12 @@ export class AiAssistantController {
     return this.llm.estado();
   }
 
+  /** Cuánto va costando el uso del modelo */
+  @Get('costos')
+  costos() {
+    return this.llm.costos();
+  }
+
   @Post('chat')
   async chat(@Body() body: ChatRequestDto) {
     return this.llm.chat(body.mensaje, body.historial ?? []);

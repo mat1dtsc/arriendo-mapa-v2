@@ -58,9 +58,36 @@ export interface RespuestaChat {
   proveedor?: string;
 }
 
+/** USD por millón de tokens. Ajustable si cambian las tarifas. */
+const PRECIOS: Record<string, { in: number; out: number }> = {
+  'deepseek-v4-flash': { in: 0.14, out: 0.28 },
+  'deepseek-v4-pro': { in: 0.55, out: 2.19 },
+  'kimi-k2.6': { in: 0.6, out: 2.5 },
+  'kimi-k3': { in: 3, out: 15 },
+};
+const USD_CLP = 950;
+
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
+  /** Contabilidad de consumo para saber cuánto cuesta cada conversación */
+  private consumo = { mensajes: 0, llamadas: 0, tok_in: 0, tok_out: 0, tok_razonamiento: 0, usd: 0 };
+
+  costos() {
+    const c = this.consumo;
+    const porMensaje = c.mensajes ? c.usd / c.mensajes : 0;
+    return {
+      ...c,
+      usd: +c.usd.toFixed(5),
+      usd_por_mensaje: +porMensaje.toFixed(5),
+      clp_por_mensaje: +(porMensaje * USD_CLP).toFixed(2),
+      proyeccion_usuario_40_msg_semana: {
+        mensajes_mes: 160,
+        usd_mes: +(porMensaje * 160).toFixed(3),
+        clp_mes: Math.round(porMensaje * 160 * USD_CLP),
+      },
+    };
+  }
 
   constructor(
     private readonly config: ConfigService,
@@ -137,6 +164,7 @@ export class LlmService {
     const acciones: AccionMapa[] = [];
     const toolsUsadas: string[] = [];
     let texto = '';
+    this.consumo.mensajes += 1;
 
     for (let paso = 0; paso < 4; paso++) {
       const ctrl = new AbortController();
@@ -163,6 +191,16 @@ export class LlmService {
         data = await r.json();
       } finally {
         clearTimeout(timer);
+      }
+
+      const u = data?.usage;
+      if (u) {
+        const p = PRECIOS[modelo] ?? { in: 0.14, out: 0.28 };
+        this.consumo.llamadas += 1;
+        this.consumo.tok_in += u.prompt_tokens ?? 0;
+        this.consumo.tok_out += u.completion_tokens ?? 0;
+        this.consumo.tok_razonamiento += u.completion_tokens_details?.reasoning_tokens ?? 0;
+        this.consumo.usd += ((u.prompt_tokens ?? 0) * p.in + (u.completion_tokens ?? 0) * p.out) / 1e6;
       }
 
       const msg = data?.choices?.[0]?.message;
