@@ -1,13 +1,41 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { PropiedadesService, FiltrosBusqueda } from './propiedades.service';
 import { ReportesService } from './reportes.service';
+import { AgentesService } from './agentes.service';
 
 @Controller('propiedades')
 export class PropiedadesController {
   constructor(
     private readonly propiedades: PropiedadesService,
     private readonly reportes: ReportesService,
+    private readonly agentes: AgentesService,
   ) {}
+
+  /** Agentes personales de búsqueda */
+  @Get('agentes')
+  listarAgentes() {
+    return this.agentes.listar();
+  }
+
+  @Post('agentes')
+  crearAgente(@Body() body: any) {
+    return this.agentes.crear(body);
+  }
+
+  @Post('agentes/:id/revisar')
+  revisarAgente(@Param('id') id: string) {
+    return this.agentes.revisar(id);
+  }
+
+  @Post('agentes/revisar-todos')
+  revisarTodos() {
+    return this.agentes.revisarTodos();
+  }
+
+  @Delete('agentes/:id')
+  borrarAgente(@Param('id') id: string) {
+    return this.agentes.eliminar(id);
+  }
 
   /** Calles que se anegan reportadas por la comunidad (no están en el catastro GORE) */
   @Get('reportes')

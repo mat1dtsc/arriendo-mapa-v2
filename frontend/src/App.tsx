@@ -4,6 +4,7 @@ import ChatWindow from './components/chat/ChatWindow';
 import Ficha from './components/Ficha';
 import Buscador from './components/Buscador';
 import Reportar from './components/Reportar';
+import MiAgente from './components/MiAgente';
 import { useAiChat } from './hooks/useAiChat';
 import { api, AccionMapa, CasaCompacta, Filtros } from './api';
 
@@ -27,6 +28,7 @@ export default function App() {
   const [activas, setActivas] = useState<Record<string, boolean>>({ flood: true, metro: true, stops: false, reportes: true });
   const [buscadorAbierto, setBuscadorAbierto] = useState(false);
   const [reportarAbierto, setReportarAbierto] = useState(false);
+  const [agenteAbierto, setAgenteAbierto] = useState(false);
   const [filtros, setFiltros] = useState<Filtros>({});
   const [previa, setPrevia] = useState<number | null>(null);
   const [alertas, setAlertas] = useState<any[]>([]);
@@ -142,6 +144,11 @@ export default function App() {
         )}
       </div>
 
+      {agenteAbierto && (
+        <MiAgente filtros={filtros} onCerrar={() => setAgenteAbierto(false)}
+          onListo={(msg) => { setToast('🤖 ' + msg); api.agentes().then(setAlertas).catch(() => {}); }} />
+      )}
+
       {reportarAbierto && (
         <Reportar comunaSugerida={filtros.comuna}
           onCerrar={() => setReportarAbierto(false)}
@@ -149,7 +156,7 @@ export default function App() {
       )}
 
       {buscadorAbierto && (
-        <Buscador filtros={filtros} setFiltros={setFiltros} onBuscar={buscar} onAlerta={crearAlerta}
+        <Buscador filtros={filtros} setFiltros={setFiltros} onBuscar={buscar} onAlerta={() => { setBuscadorAbierto(false); setAgenteAbierto(true); }}
           resultados={previa} onCerrar={() => setBuscadorAbierto(false)} />
       )}
 
@@ -163,6 +170,7 @@ export default function App() {
       ) : (
         <div className="fabs">
           <button className="fab sec" onClick={() => setReportarAbierto(true)} title="Reportar calle que se anega">💧</button>
+          <button className="fab sec" onClick={() => setAgenteAbierto(true)} title="Crear mi agente de búsqueda">🤖</button>
           <button className="fab sec" onClick={() => setBuscadorAbierto(true)}>⚙️ Filtros</button>
           <button className="fab" onClick={() => setChatAbierto(true)}>
             <span className="dot-live" /> Hablar con mi agente

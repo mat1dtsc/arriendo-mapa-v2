@@ -133,7 +133,7 @@ export default function Buscador({ filtros, setFiltros, onBuscar, onAlerta, resu
           <button className="pri" onClick={() => onBuscar(filtros)}>Ver en el mapa</button>
         </div>
         <button className="alerta" onClick={() => onAlerta(filtros)}>
-          🔔 Avísame cuando aparezca algo así
+          🤖 Que un agente busque esto por mí
         </button>
       </div>
     </aside>

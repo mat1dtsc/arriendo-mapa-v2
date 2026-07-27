@@ -28,6 +28,10 @@ export const api = {
     return fetch('/api/propiedades' + (q.toString() ? '?' + q : '')).then(j);
   },
   opciones: (): Promise<Opciones> => fetch('/api/propiedades/opciones').then(j),
+  crearAgente: (b: { email?: string; telefono?: string; filtros: Filtros; aviso?: string }): Promise<any> =>
+    fetch('/api/propiedades/agentes', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(b) }).then(j),
+  agentes: (): Promise<any[]> => fetch('/api/propiedades/agentes').then(j),
   reportar: (b: { calle: string; comuna: string; causa?: string; detalle?: string }): Promise<any> =>
     fetch('/api/propiedades/reportes', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(b) }).then(j),
