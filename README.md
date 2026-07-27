@@ -67,6 +67,8 @@ El **mapa es la portada**: MapLibre GL vectorial oscuro con inclinación 3D, pí
 | `AiChatbot.jsx` + `useAiChat.js` | `ChatWindow.tsx` + `useAiChat.ts` (badge del motor activo) |
 | Pinecone RAG | F3: pgvector en Supabase |
 
+**Reportes vecinales**: el catastro del GORE tiene 175 puntos, pero los vecinos saben más. Cualquiera puede marcar una calle que se anega (botón 💧 o pidiéndoselo al agente): se geocodifica contra OpenStreetMap y se dibuja en **ámbar punteado**, distinta del catastro oficial, con contador de confirmaciones.
+
 **Agente, no buscador**: el chat se presenta como un agente que trabaja para el usuario — compara comunas, advierte riesgos sin que se los pregunten y ofrece **dejar una alerta** (`crear_alerta`) cuando todavía no hay nada que calce. Además hay un **buscador con menús desplegables** (tipo, comuna, precio, dormitorios, baños, m², riesgo, locomoción y amenidades) con vista previa de resultados en vivo.
 
 **El twist propio**: cada tool devuelve `datos` (para el LLM) **y** `accion` (para el mapa). El chat no solo responde: mueve, filtra y vuela el mapa.

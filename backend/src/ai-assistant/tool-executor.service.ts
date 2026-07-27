@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PropiedadesService, FiltrosBusqueda } from '../propiedades/propiedades.service';
+import { ReportesService } from '../propiedades/reportes.service';
 
 export interface AccionMapa {
-  tipo: 'filtrar' | 'volar' | 'centrar' | 'alerta';
+  tipo: 'filtrar' | 'volar' | 'centrar' | 'alerta' | 'reporte';
   alerta?: any;
+  reporte?: any;
   ids?: number[];
   lat?: number;
   lon?: number;
@@ -22,10 +24,24 @@ export class ToolExecutorService {
   /** Alertas en memoria (F2: pasan a Supabase con el perfil del usuario) */
   private alertas: any[] = [];
 
-  constructor(private readonly propiedades: PropiedadesService) {}
+  constructor(
+    private readonly propiedades: PropiedadesService,
+    private readonly reportes: ReportesService,
+  ) {}
 
   listarAlertas() {
     return this.alertas;
+  }
+
+  /** Tools que necesitan red (geocodificación) */
+  async ejecutarAsync(nombre: string, input: any): Promise<ResultadoTool> {
+    if (nombre === 'reportar_calle_inundable') {
+      const r = await this.reportes.crear({
+        calle: input.calle, comuna: input.comuna, causa: input.causa, detalle: input.detalle,
+      });
+      return { datos: r, accion: r.ok ? ({ tipo: 'reporte', reporte: (r as any).reporte } as any) : undefined };
+    }
+    return this.ejecutar(nombre, input);
   }
 
   ejecutar(nombre: string, input: any): ResultadoTool {

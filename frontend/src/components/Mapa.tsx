@@ -100,6 +100,33 @@ export default function Mapa({ casas, capas, idsVisibles, seleccion, orden, onSe
     m.on('mouseenter', 'calles-body', () => { m.getCanvas().style.cursor = 'pointer'; });
     m.on('mouseleave', 'calles-body', () => { m.getCanvas().style.cursor = ''; });
 
+    // ── Reportes vecinales: mismo fenómeno, otra evidencia → otro estilo ──
+    m.addSource('reportes', { type: 'geojson', data: fc((capas.reportes || []).map((t: any) => ({
+      type: 'Feature',
+      properties: { sector: t.s, comuna: t.k, calle: t.n, conf: t.conf ?? 1 },
+      geometry: { type: 'LineString', coordinates: t.c },
+    }))) });
+    m.addLayer({ id: 'rep-glow', type: 'line', source: 'reportes', minzoom: 10.5,
+      layout: { 'line-cap': 'round' },
+      paint: { 'line-color': '#FFC857',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 7, 16, 26],
+        'line-blur': ['interpolate', ['linear'], ['zoom'], 11, 6, 16, 16],
+        'line-opacity': 0.35 } } as any);
+    m.addLayer({ id: 'rep-body', type: 'line', source: 'reportes', minzoom: 10.5,
+      layout: { 'line-cap': 'round' },
+      paint: { 'line-color': '#FFD98A',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2.2, 16, 9],
+        'line-opacity': 0.9, 'line-dasharray': [2.5, 1.5] } } as any);
+    m.on('click', 'rep-body', (e: any) => {
+      const p = e.features[0].properties;
+      new maplibregl.Popup({ closeButton: false, offset: 8 }).setLngLat(e.lngLat)
+        .setHTML('<div style="font:600 11.5px Archivo,sans-serif;color:#0b1620">💧 <b>' + (p.calle || '') +
+          '</b><br>' + p.sector + '<br><span style="opacity:.6">' + p.comuna +
+          ' · reporte vecinal · ' + p.conf + ' confirmación(es)</span></div>').addTo(m);
+    });
+    m.on('mouseenter', 'rep-body', () => { m.getCanvas().style.cursor = 'pointer'; });
+    m.on('mouseleave', 'rep-body', () => { m.getCanvas().style.cursor = ''; });
+
     m.addSource('flood', { type: 'geojson', data: fc((capas.pc || []).map((p: any) => ({
       type: 'Feature', properties: { causa: p.causa, sector: p.sector, comuna: p.comuna },
       geometry: { type: 'Point', coordinates: [p.lon, p.lat] } }))) });
@@ -190,12 +217,27 @@ export default function Mapa({ casas, capas, idsVisibles, seleccion, orden, onSe
     });
   }, [idsVisibles, seleccion, casas]);
 
+  // refresco de reportes tras crear uno nuevo
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !capas) return;
+    const src: any = m.getSource('reportes');
+    if (src?.setData) {
+      src.setData(fc((capas.reportes || []).map((t: any) => ({
+        type: 'Feature',
+        properties: { sector: t.s, comuna: t.k, calle: t.n, conf: t.conf ?? 1 },
+        geometry: { type: 'LineString', coordinates: t.c },
+      }))) as any);
+    }
+  }, [capas]);
+
   useEffect(() => {
     const m = map.current;
     if (!m) return;
     (window as any).__toggleCapa = (capa: string, on: boolean) => {
       const ids: Record<string, string[]> = {
         flood: ['calles-glow', 'calles-body', 'calles-flow', 'flood-heat', 'flood-pt', 'canal', 'canal-glow'],
+        reportes: ['rep-glow', 'rep-body'],
         metro: ['metro', 'mest'], stops: ['stops'],
       };
       (ids[capa] || []).forEach((i) => { if (m.getLayer(i)) m.setLayoutProperty(i, 'visibility', on ? 'visible' : 'none'); });

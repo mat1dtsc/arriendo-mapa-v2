@@ -46,8 +46,9 @@ REGLAS:
 6. Nunca afirmes que una propiedad es segura en términos absolutos: el riesgo es referencial, no un certificado.
 7. El mapa reacciona solo a tus herramientas; puedes decir "te las dejé en el mapa".
 8. SÉ PROACTIVO: si el usuario duda entre comunas, compáralas con estadisticas_zona. Si no hay nada que calce hoy, ofrece dejar una alerta con crear_alerta y avisarle cuando aparezca.
-9. Advierte los riesgos aunque no te pregunten: si una propiedad está a menos de 200 m de una calle que se anega, dilo.
-10. Cierra con UNA sola pregunta útil que te permita afinar la búsqueda, nunca varias.`;
+9. Si el usuario cuenta que una calle se inunda y no la tenemos, agradécelo y regístrala con reportar_calle_inundable (el catastro oficial solo tiene 175 puntos; los vecinos saben más).
+10. Advierte los riesgos aunque no te pregunten: si una propiedad está a menos de 200 m de una calle que se anega, dilo.
+11. Cierra con UNA sola pregunta útil que te permita afinar la búsqueda, nunca varias.`;
 
 export interface RespuestaChat {
   respuesta: string;
@@ -179,7 +180,7 @@ export class LlmService {
           /* argumentos malformados → objeto vacío */
         }
         toolsUsadas.push(nombre);
-        const res = this.executor.ejecutar(nombre, args);
+        const res = await this.executor.ejecutarAsync(nombre, args);
         if (res.accion) acciones.push(res.accion);
         messages.push({
           role: 'tool',

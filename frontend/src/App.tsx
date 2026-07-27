@@ -3,6 +3,7 @@ import Mapa from './components/Mapa';
 import ChatWindow from './components/chat/ChatWindow';
 import Ficha from './components/Ficha';
 import Buscador from './components/Buscador';
+import Reportar from './components/Reportar';
 import { useAiChat } from './hooks/useAiChat';
 import { api, AccionMapa, CasaCompacta, Filtros } from './api';
 
@@ -10,6 +11,7 @@ const CAPAS = [
   { id: 'flood', label: '💧 Inundación', color: 'var(--cyan)', on: true },
   { id: 'metro', label: 'Ⓜ️ Metro', color: 'var(--violet)', on: true },
   { id: 'stops', label: '🚌 Paraderos', color: 'var(--amber)', on: false },
+  { id: 'reportes', label: '👥 Reportes vecinos', color: '#FFD98A', on: true },
 ];
 
 export default function App() {
@@ -22,8 +24,9 @@ export default function App() {
   const [chatAbierto, setChatAbierto] = useState(false);
   const [mapaListo, setMapaListo] = useState(false);
   const [mapaLento, setMapaLento] = useState(false);
-  const [activas, setActivas] = useState<Record<string, boolean>>({ flood: true, metro: true, stops: false });
+  const [activas, setActivas] = useState<Record<string, boolean>>({ flood: true, metro: true, stops: false, reportes: true });
   const [buscadorAbierto, setBuscadorAbierto] = useState(false);
+  const [reportarAbierto, setReportarAbierto] = useState(false);
   const [filtros, setFiltros] = useState<Filtros>({});
   const [previa, setPrevia] = useState<number | null>(null);
   const [alertas, setAlertas] = useState<any[]>([]);
@@ -139,6 +142,12 @@ export default function App() {
         )}
       </div>
 
+      {reportarAbierto && (
+        <Reportar comunaSugerida={filtros.comuna}
+          onCerrar={() => setReportarAbierto(false)}
+          onListo={(msg) => { setToast('💧 ' + msg); api.capas().then(setCapas).catch(() => {}); }} />
+      )}
+
       {buscadorAbierto && (
         <Buscador filtros={filtros} setFiltros={setFiltros} onBuscar={buscar} onAlerta={crearAlerta}
           resultados={previa} onCerrar={() => setBuscadorAbierto(false)} />
@@ -153,6 +162,7 @@ export default function App() {
           estado={estado} onCerrar={() => setChatAbierto(false)} />
       ) : (
         <div className="fabs">
+          <button className="fab sec" onClick={() => setReportarAbierto(true)} title="Reportar calle que se anega">💧</button>
           <button className="fab sec" onClick={() => setBuscadorAbierto(true)}>⚙️ Filtros</button>
           <button className="fab" onClick={() => setChatAbierto(true)}>
             <span className="dot-live" /> Hablar con mi agente

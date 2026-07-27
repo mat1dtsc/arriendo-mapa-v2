@@ -1,9 +1,29 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { PropiedadesService, FiltrosBusqueda } from './propiedades.service';
+import { ReportesService } from './reportes.service';
 
 @Controller('propiedades')
 export class PropiedadesController {
-  constructor(private readonly propiedades: PropiedadesService) {}
+  constructor(
+    private readonly propiedades: PropiedadesService,
+    private readonly reportes: ReportesService,
+  ) {}
+
+  /** Calles que se anegan reportadas por la comunidad (no están en el catastro GORE) */
+  @Get('reportes')
+  listarReportes() {
+    return this.reportes.listar();
+  }
+
+  @Post('reportes')
+  crearReporte(@Body() body: { calle: string; comuna: string; causa?: string; detalle?: string }) {
+    return this.reportes.crear(body);
+  }
+
+  @Post('reportes/:id/confirmar')
+  confirmar(@Param('id') id: string) {
+    return this.reportes.confirmar(id);
+  }
 
   @Get()
   listar(@Query() q: Record<string, string>) {
@@ -30,7 +50,7 @@ export class PropiedadesController {
 
   @Get('capas')
   capas() {
-    return this.propiedades.capas();
+    return { ...this.propiedades.capas(), reportes: this.reportes.tramos() };
   }
 
   @Get(':id')

@@ -28,6 +28,9 @@ export const api = {
     return fetch('/api/propiedades' + (q.toString() ? '?' + q : '')).then(j);
   },
   opciones: (): Promise<Opciones> => fetch('/api/propiedades/opciones').then(j),
+  reportar: (b: { calle: string; comuna: string; causa?: string; detalle?: string }): Promise<any> =>
+    fetch('/api/propiedades/reportes', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(b) }).then(j),
   capas: (): Promise<any> => fetch('/api/propiedades/capas').then(j),
   informe: (id: number): Promise<any> => fetch(`/api/propiedades/${id}`).then(j),
   estado: (): Promise<EstadoIA> => fetch('/api/ai/estado').then(j),

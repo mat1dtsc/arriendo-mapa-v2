@@ -67,5 +67,20 @@ export const TOOL_DECLARATIONS = [
       },
       required: ['nombre', 'filtros'],
     },
+  },,
+  {
+    name: 'reportar_calle_inundable',
+    description:
+      'Registra una calle que se anega y NO está en el catastro oficial. Úsala cuando el usuario diga que una calle se inunda, se llena de agua o se corta cuando llueve. Necesitas nombre de calle y comuna: si falta la comuna, pregúntala antes. La calle queda dibujada en el mapa como reporte vecinal.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        calle: { type: 'string', description: 'Nombre de la calle tal como aparece en mapas, ej: "Avenida Santa Rosa"' },
+        comuna: { type: 'string', description: 'Comuna donde está el tramo' },
+        causa: { type: 'string', description: 'Qué ocurre: anegamiento, desborde de canal, colector colapsado, etc.' },
+        detalle: { type: 'string', description: 'Tramo o referencia, ej: "entre Eyzaguirre y el puente"' },
+      },
+      required: ['calle', 'comuna'],
+    },
   },
 ];
