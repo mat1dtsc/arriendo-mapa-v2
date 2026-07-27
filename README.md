@@ -77,6 +77,7 @@ El **mapa es la portada**: MapLibre GL vectorial oscuro con inclinación 3D, pí
 - 💧 **Calles que se anegan**: 423 **tramos de calle reales** (geometría OSM) derivados de los 154 puntos críticos oficiales del GORE RM (14-jul-2026), animados como corriente de agua y coloreados por causa (desborde de cauce, colector colapsado, quebrada, anegamiento). El riesgo de cada propiedad se calcula por **distancia al tramo**, no al punto.
 - 🚌 **Locomoción real**: recorridos de micros, buses/hora punta, paradero y Metro más cercanos (GTFS Red Movilidad DTPM, 04-jul-2026) → score 0-100.
 - 💰 Precio $/m² vs mediana comunal. 136 avisos reales.
+- 📷 **Fotos acreditables**: si una imagen aparece en más de un aviso no puede acreditarse como de esa propiedad, así que se descarta y se muestra un vacío explicado. En el dataset original 128 de 136 casas compartían la misma foto genérica; quedaron 9 con imagen propia.
 
 ## Correr en local
 ```bash

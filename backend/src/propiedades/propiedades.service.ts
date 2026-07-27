@@ -89,6 +89,7 @@ export class PropiedadesService {
       nota: c.nota,
       link: c.link,
       fotos: c.fotos,
+      foto_verificada: c.foto_verificada ?? (c.fotos?.length ? true : false),
       amenidades: c.amen,
       precio_por_m2: c.pxm,
       mediana_comuna_m2: this.datos.meta.medianas_pxm[c.comuna] ?? null,

@@ -203,3 +203,10 @@ body{background:var(--bg);color:var(--fg);font-family:Archivo,system-ui,sans-ser
 .rp-nota{font-size:11px;color:var(--faint);line-height:1.6}
 .rp-nota b{color:var(--amber)}
 .bs-btns .pri:disabled{opacity:.6}
+
+/* ── Sin foto acreditable: mejor vacío honesto que la foto de otra casa ── */
+.sh-nofoto{background:linear-gradient(160deg,var(--surface2),var(--bg));border-bottom:1px solid var(--line);
+  padding:20px 18px;text-align:center}
+.nf-ico{font-size:22px;opacity:.5;margin-bottom:6px}
+.nf-t{font-size:12.5px;font-weight:800;color:var(--dim);letter-spacing:.3px}
+.nf-s{font-size:11px;color:var(--faint);line-height:1.55;margin-top:5px;max-width:280px;margin-left:auto;margin-right:auto}

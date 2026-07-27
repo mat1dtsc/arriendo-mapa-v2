@@ -16,8 +16,16 @@ export default function Ficha({ data: d, onCerrar }: { data: any; onCerrar: () =
     <aside className="sheet open">
       <button className="x" onClick={onCerrar}>✕</button>
       <div className="sh-scroll">
-        {d.fotos?.length > 0 && (
-          <div className="sh-img">{d.fotos.map((f: string, i: number) => <img key={i} src={f} alt="" loading="lazy" />)}</div>
+        {d.fotos?.length > 0 ? (
+          <div className="sh-img">
+            {d.fotos.map((f: string) => <img key={f} src={f} alt={'Foto de ' + d.sector} loading="lazy" />)}
+          </div>
+        ) : (
+          <div className="sh-nofoto">
+            <div className="nf-ico">📷</div>
+            <div className="nf-t">Sin foto propia verificada</div>
+            <div className="nf-s">El aviso no trae una imagen que podamos acreditar como de esta propiedad. Prefiero no mostrarte la foto de otra casa.</div>
+          </div>
         )}
         <div className="sh-body">
           <div className="sh-price mono">{CLP(d.precio)} <em>/mes</em></div>
