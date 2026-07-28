@@ -116,6 +116,105 @@ export class LlmService {
     };
   }
 
+  // ─────────── Primitivos que usan los patrones agénticos ───────────
+
+  /** Resuelve el proveedor OpenAI-compatible activo (null si es básico/claude) */
+  private resolverProveedor() {
+    const { activo } = this.estado();
+    if (activo === 'basico' || activo === 'claude') return null;
+    const cfg = PROVEEDORES[activo as 'deepseek' | 'kimi'];
+    return {
+      prov: activo,
+      apiKey: this.config.get<string>(cfg.envKey),
+      modelo: this.config.get<string>('LLM_MODEL') || cfg.modelo,
+      base: this.config.get<string>('LLM_BASE_URL') || cfg.base,
+      etiqueta: cfg.etiqueta,
+    };
+  }
+
+  /** Suma el consumo de una llamada al acumulador de costos */
+  private contabilizar(u: any, modelo: string) {
+    if (!u) return;
+    const p = PRECIOS[modelo] ?? { in: 0.14, out: 0.28 };
+    this.consumo.llamadas += 1;
+    this.consumo.tok_in += u.prompt_tokens ?? 0;
+    this.consumo.tok_out += u.completion_tokens ?? 0;
+    this.consumo.tok_razonamiento += u.completion_tokens_details?.reasoning_tokens ?? 0;
+    this.consumo.usd += ((u.prompt_tokens ?? 0) * p.in + (u.completion_tokens ?? 0) * p.out) / 1e6;
+  }
+
+  /** Una sola llamada al modelo, sin herramientas. Devuelve texto (o null si es modo básico). */
+  async completar(
+    system: string,
+    user: string,
+    opts: { maxTokens?: number; temperatura?: number } = {},
+  ): Promise<string | null> {
+    const p = this.resolverProveedor();
+    if (!p) return null;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 40_000);
+    try {
+      const r = await fetch(`${p.base}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${p.apiKey}` },
+        body: JSON.stringify({
+          model: p.modelo,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          temperature: opts.temperatura ?? 0.2,
+          max_tokens: opts.maxTokens ?? 500,
+        }),
+        signal: ctrl.signal,
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 150)}`);
+      const data = await r.json();
+      this.contabilizar(data?.usage, p.modelo);
+      return (data?.choices?.[0]?.message?.content || '').trim();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** Igual que completar() pero parsea JSON (tolerante a ```fences```). */
+  async completarJson<T = any>(
+    system: string,
+    user: string,
+    opts: { maxTokens?: number; temperatura?: number } = {},
+  ): Promise<T | null> {
+    const txt = await this.completar(system, user, opts);
+    if (!txt) return null;
+    try {
+      return JSON.parse(txt.replace(/```json|```/g, '').trim());
+    } catch {
+      // rescatar el primer objeto/array que aparezca
+      const m = txt.match(/[[{][\s\S]*[\]}]/);
+      if (m) {
+        try {
+          return JSON.parse(m[0]);
+        } catch {
+          /* nada */
+        }
+      }
+      return null;
+    }
+  }
+
+  /** El loop de tool-calling, parametrizable por prompt de sistema. Lo usan pipeline y planner. */
+  async ejecutarConHerramientas(
+    mensaje: string,
+    historial: Array<{ rol: string; texto: string }> = [],
+    system: string = SYSTEM_PROMPT,
+  ): Promise<{ texto: string; acciones: AccionMapa[]; toolsUsadas: string[]; datosTools: any[] }> {
+    const p = this.resolverProveedor();
+    if (!p) {
+      const b = this.basico.responder(mensaje);
+      return { texto: b.respuesta, acciones: b.acciones, toolsUsadas: b.tools_usadas, datosTools: [] };
+    }
+    return this.loopHerramientas(p, mensaje, historial, system);
+  }
+
   async chat(mensaje: string, historial: Array<{ rol: string; texto: string }> = []): Promise<RespuestaChat> {
     const { activo, etiqueta } = this.estado();
     if (activo === 'basico') return { ...this.basico.responder(mensaje), modo: 'basico' };
@@ -124,27 +223,27 @@ export class LlmService {
       return { ...r, modo: 'claude', proveedor: 'Claude' };
     }
     try {
-      return await this.chatOpenAICompatible(activo as 'deepseek' | 'kimi', mensaje, historial, etiqueta);
+      this.consumo.mensajes += 1;
+      const r = await this.loopHerramientas(
+        { prov: activo, apiKey: this.config.get<string>(PROVEEDORES[activo as 'deepseek' | 'kimi'].envKey),
+          modelo: this.config.get<string>('LLM_MODEL') || PROVEEDORES[activo as 'deepseek' | 'kimi'].modelo,
+          base: this.config.get<string>('LLM_BASE_URL') || PROVEEDORES[activo as 'deepseek' | 'kimi'].base, etiqueta },
+        mensaje, historial, SYSTEM_PROMPT,
+      );
+      return { respuesta: r.texto, acciones: r.acciones, tools_usadas: r.toolsUsadas, modo: activo, proveedor: etiqueta };
     } catch (e) {
       this.logger.error(`${activo} falló: ${String(e).slice(0, 200)} — cayendo a modo básico`);
       return { ...this.basico.responder(mensaje), modo: 'basico' };
     }
   }
 
-  /** Loop agéntico en formato OpenAI (sirve para DeepSeek y Kimi). */
-  private async chatOpenAICompatible(
-    prov: 'deepseek' | 'kimi',
+  /** Loop agéntico en formato OpenAI (DeepSeek/Kimi). Captura texto, acciones y los datos crudos de las tools. */
+  private async loopHerramientas(
+    p: { prov: string; apiKey?: string; modelo: string; base: string; etiqueta: string },
     mensaje: string,
     historial: Array<{ rol: string; texto: string }>,
-    etiqueta: string,
-  ): Promise<RespuestaChat> {
-    const cfg = PROVEEDORES[prov];
-    const apiKey = this.config.get<string>(cfg.envKey);
-    const modelo = this.config.get<string>('LLM_MODEL') || cfg.modelo;
-    // Override para Ollama local o gateways compatibles (ej: http://localhost:11434/v1)
-    const base = this.config.get<string>('LLM_BASE_URL') || cfg.base;
-
-    // Las mismas declaraciones, en formato OpenAI
+    system: string,
+  ): Promise<{ texto: string; acciones: AccionMapa[]; toolsUsadas: string[]; datosTools: any[] }> {
     // filter(Boolean): una coma doble en el arreglo deja un hueco (undefined)
     // y el proveedor rechaza el request completo con HTTP 400.
     const tools = TOOL_DECLARATIONS.filter(Boolean).map((t) => ({
@@ -153,56 +252,37 @@ export class LlmService {
     }));
 
     const messages: any[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...historial.slice(-8).map((m) => ({
-        role: m.rol === 'usuario' ? 'user' : 'assistant',
-        content: m.texto,
-      })),
+      { role: 'system', content: system },
+      ...historial.slice(-8).map((m) => ({ role: m.rol === 'usuario' ? 'user' : 'assistant', content: m.texto })),
       { role: 'user', content: mensaje },
     ];
 
     const acciones: AccionMapa[] = [];
     const toolsUsadas: string[] = [];
+    const datosTools: any[] = [];
     let texto = '';
-    this.consumo.mensajes += 1;
 
     for (let paso = 0; paso < 4; paso++) {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 45_000);
       let data: any;
       try {
-        const r = await fetch(`${base}/chat/completions`, {
+        const r = await fetch(`${p.base}/chat/completions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${p.apiKey}` },
           body: JSON.stringify({
-            model: modelo,
-            messages,
-            tools,
-            tool_choice: 'auto',
-            temperature: 0.3,
-            max_tokens: 900, // bajo a propósito: Kimi cuenta esto contra el rate limit
+            model: p.modelo, messages, tools, tool_choice: 'auto',
+            temperature: 0.3, max_tokens: 900,
           }),
           signal: ctrl.signal,
         });
-        if (!r.ok) {
-          const err = await r.text();
-          throw new Error(`${prov} HTTP ${r.status}: ${err.slice(0, 200)}`);
-        }
+        if (!r.ok) throw new Error(`${p.prov} HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
         data = await r.json();
       } finally {
         clearTimeout(timer);
       }
 
-      const u = data?.usage;
-      if (u) {
-        const p = PRECIOS[modelo] ?? { in: 0.14, out: 0.28 };
-        this.consumo.llamadas += 1;
-        this.consumo.tok_in += u.prompt_tokens ?? 0;
-        this.consumo.tok_out += u.completion_tokens ?? 0;
-        this.consumo.tok_razonamiento += u.completion_tokens_details?.reasoning_tokens ?? 0;
-        this.consumo.usd += ((u.prompt_tokens ?? 0) * p.in + (u.completion_tokens ?? 0) * p.out) / 1e6;
-      }
-
+      this.contabilizar(data?.usage, p.modelo);
       const msg = data?.choices?.[0]?.message;
       if (!msg) throw new Error('respuesta vacía del proveedor');
       texto = (msg.content || '').trim();
@@ -217,25 +297,16 @@ export class LlmService {
         try {
           args = JSON.parse(tc.function?.arguments || '{}');
         } catch {
-          /* argumentos malformados → objeto vacío */
+          /* argumentos malformados */
         }
         toolsUsadas.push(nombre);
         const res = await this.executor.ejecutarAsync(nombre, args);
         if (res.accion) acciones.push(res.accion);
-        messages.push({
-          role: 'tool',
-          tool_call_id: tc.id,
-          content: JSON.stringify(res.datos).slice(0, 6000),
-        });
+        datosTools.push({ tool: nombre, args, datos: res.datos });
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(res.datos).slice(0, 6000) });
       }
     }
 
-    return {
-      respuesta: texto || 'No pude armar una respuesta, intenta de nuevo.',
-      acciones,
-      tools_usadas: toolsUsadas,
-      modo: prov,
-      proveedor: etiqueta,
-    };
+    return { texto: texto || 'No pude armar una respuesta, intenta de nuevo.', acciones, toolsUsadas, datosTools };
   }
 }
